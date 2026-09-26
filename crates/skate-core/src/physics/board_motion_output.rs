@@ -74,5 +74,7 @@ pub(crate) fn inverse_length_squared(squared: f32, refinements: usize) -> f32 {
 pub fn length(v: Vector3) -> f32 {
     let squared = dot(v, v);
     let value = squared * inverse_length_squared(squared, 2);
-    if squared == 0.0 { 0.0 } else { value }
+    // VMX flushes denormals to zero. On x86 a subnormal squared length made the reciprocal
+    // square root infinite, the length infinite, and callers such as clamp_length NaN (SK-031).
+    if squared == 0.0 || squared.is_subnormal() { 0.0 } else { value }
 }

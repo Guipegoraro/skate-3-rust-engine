@@ -200,3 +200,32 @@ fn university_bail_checkpoint_respawn_stays_finite() {
         eprintln!("CHECKPOINT heading {} ok state {:?}", map.heading, s.skater.player_state.current());
     }
 }
+
+/// SK-031 regression: normal difficulty, repeated ollies with released input on landing,
+/// plus stepping off/on the board, near the second crash (University, 26/09).
+#[test]
+#[ignore = "requires private stock assets and University.skate; SK-031 landing NaN"]
+fn university_ollies_and_mounts_stay_finite() {
+    let assets = Assets::load();
+    let path = std::env::var_os("SK_MAP").expect("set SK_MAP to University.skate");
+    let mut map = skate_data::skate_map::SkateMap::load(std::path::Path::new(&path)).unwrap();
+    for (spot, heading) in [([371.9, 100.9, -626.8], 1.6), ([399.98, 103.7, -668.97], 0.2), ([375.9, 125.2, -713.7], 2.2)] {
+        map.spawn = spot;
+        map.heading = heading;
+        let physics = GamePhysics::load_with_map(&assets.root, Some(&map)).unwrap();
+        let mut s = Session::new(&assets, physics, |p| p.set_difficulty(crate::difficulty::Difficulty::Normal));
+        for tick in 0..6000usize {
+            let phase = tick % 100;
+            // Ollie: right stick down then flick up; every 7th cycle step off (Y) and back on.
+            let right = match phase { 40..=47 => [0, -32767], 48..=53 => [0, 32767], _ => [0, 0] };
+            let cycle = tick / 100;
+            let buttons = if cycle % 7 == 6 && (phase == 5 || phase == 70) { Y } else { 0 };
+            let left = [((tick as f32 * 0.01).sin() * 20000.) as i16, 20000];
+            s.step_sticks(buttons, left, right).unwrap_or_else(|e| panic!("spot {spot:?} tick{tick}: {e}"));
+            // The NaN started in the ground up vector (subnormal length on landing).
+            let up = s.physics.riding.reckoning.up;
+            assert!(up.x.is_finite() && up.y.is_finite() && up.z.is_finite(), "spot {spot:?} tick{tick}: up {up:?}");
+        }
+        eprintln!("SK031 spot {spot:?} ok");
+    }
+}

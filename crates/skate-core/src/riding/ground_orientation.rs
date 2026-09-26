@@ -173,7 +173,9 @@ fn cross(a: Vector3, b: Vector3) -> Vector3 {
 }
 fn normalize_safe(value: Vector3, fallback: Vector3) -> Vector3 {
     let squared=dot(value,value); let inverse=inverse_length_squared(squared,2);
-    let magnitude=if squared==0.0 {0.0} else {squared*inverse};
+    // VMX flushes denormals to zero; on x86 a subnormal squared length (tiny lanes such as
+    // 1e-20) gave an infinite inverse and a NaN up vector on landing (SK-031).
+    let magnitude=if squared==0.0 || squared.is_subnormal() {0.0} else {squared*inverse};
     if magnitude > EPSILON { scale(value,inverse) } else { fallback }
 }
 /// Complete ClampVectorWithinMaxLength82BD3D90.
