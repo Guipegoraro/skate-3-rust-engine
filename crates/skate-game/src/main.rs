@@ -1,3 +1,4 @@
+mod audio;
 mod fps_overlay;
 mod fly_mode;
 mod game_options;

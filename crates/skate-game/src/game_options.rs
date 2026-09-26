@@ -10,12 +10,23 @@ pub(crate) struct GameOptions {
     pub stick_indicator: bool,
     /// B (or F3) on foot toggles fly mode.
     pub fly_mode: bool,
+    /// Sound channel volumes in percent, 0..=100 (SK-021).
+    pub master_volume: u32,
+    pub music_volume: u32,
+    pub effects_volume: u32,
     #[serde(skip)]
     path: PathBuf,
 }
 impl Default for GameOptions {
     fn default() -> Self {
-        Self { stick_indicator: true, fly_mode: true, path: PathBuf::new() }
+        Self {
+            stick_indicator: true,
+            fly_mode: true,
+            master_volume: 80,
+            music_volume: 70,
+            effects_volume: 100,
+            path: PathBuf::new(),
+        }
     }
 }
 
@@ -37,10 +48,37 @@ pub(crate) const ROWS: &[OptionRow] = &[
         value: |o| on_off(o.fly_mode),
         change: |o, _| o.fly_mode = !o.fly_mode,
     },
+    OptionRow {
+        label: "Master volume",
+        value: |o| percent(o.master_volume),
+        change: |o, step| o.master_volume = volume_step(o.master_volume, step),
+    },
+    OptionRow {
+        label: "Music volume",
+        value: |o| percent(o.music_volume),
+        change: |o, step| o.music_volume = volume_step(o.music_volume, step),
+    },
+    OptionRow {
+        label: "Effects volume",
+        value: |o| percent(o.effects_volume),
+        change: |o, step| o.effects_volume = volume_step(o.effects_volume, step),
+    },
 ];
 
 fn on_off(value: bool) -> String {
     if value { "On" } else { "Off" }.into()
+}
+
+fn percent(value: u32) -> String {
+    format!("{value}%")
+}
+
+/// Left/Right step by 10. Right/Enter/click past 100 wraps to 0, so a mouse alone can set it.
+fn volume_step(value: u32, step: i32) -> u32 {
+    if step > 0 && value >= 100 {
+        return 0;
+    }
+    (value as i32 + step.signum() * 10).clamp(0, 100) as u32
 }
 
 impl GameOptions {

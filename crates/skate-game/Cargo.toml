@@ -26,7 +26,7 @@ dev-dynamic = ["bevy/dynamic_linking"]
 brp = ["dep:bevy_brp_extras"]
 
 [dependencies]
-bevy = { workspace = true, features = ["jpeg", "trace", "debug"] }
+bevy = { workspace = true, features = ["jpeg", "trace", "debug", "wav"] }
 tracing-log = "0.2"
 skate-core.workspace = true
 skate-data.workspace = true
