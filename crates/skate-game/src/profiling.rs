@@ -524,6 +524,12 @@ fn render_label(path: &str, id: usize) -> Option<String> {
                     | "ui"
             )
         })
+        // Shadow views are named per light and cascade; group them under one label (SK-018).
+        .or_else(|| {
+            path.split('/')
+                .any(|s| s.starts_with("shadow_directional_light"))
+                .then_some("shadow_directional_light")
+        })
         .unwrap_or("other_pass");
     Some(format!("render/{id}/{pass}/{field}"))
 }

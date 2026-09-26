@@ -201,6 +201,17 @@ fn setup(
         Ok("1") => settings.occlusion = true,
         _ => {}
     }
+    // SK-018 benchmark overrides; invalid values are ignored.
+    let env_u32 = |key| std::env::var(key).ok().and_then(|v| v.parse::<u32>().ok());
+    if let Some(scale) = env_u32("SKATE_RENDER_SCALE").filter(|s| SCALES.contains(s)) {
+        settings.scale = scale;
+    }
+    if let Some(samples) = env_u32("SKATE_MSAA").filter(|s| [1, 2, 4, 8].contains(s)) {
+        settings.samples = samples;
+    }
+    if let Some(fps) = env_u32("SKATE_FPS_LIMIT") {
+        settings.fps = fps;
+    }
     if !supported_msaa.contains(&settings.samples) {
         settings.samples = 1;
     }

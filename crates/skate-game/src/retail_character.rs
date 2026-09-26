@@ -190,7 +190,22 @@ fn load(mut commands: Commands, config: Res<crate::config::Config>, sources: Que
         display_sh: None,
     });
 }
+/// Cascades and range of the character-only shadow map. The characters that sample it stay
+/// near the camera, so 2 cascades to 40 m (SK-018) replace the Bevy default of 4 to 100 m.
+/// `SKATE_CHARACTER_SHADOW=<cascades>x<metres>` (e.g. `4x100`) overrides it for A/B runs.
+fn character_shadow_range() -> (usize, f32) {
+    std::env::var("SKATE_CHARACTER_SHADOW")
+        .ok()
+        .and_then(|v| {
+            let (count, distance) = v.split_once('x')?;
+            Some((count.parse().ok()?, distance.parse().ok()?))
+        })
+        .filter(|&(count, distance): &(usize, f32)| (1..=4).contains(&count) && (15.0..=500.0).contains(&distance))
+        .unwrap_or((2, 40.0))
+}
+
 fn spawn_shadow_sources(commands: &mut Commands, light: Vec3) {
+    let (num_cascades, maximum_distance) = character_shadow_range();
     // World + skater casters, sampled only by the character shader.
     commands.spawn((
         ShadowSource,
@@ -203,7 +218,8 @@ fn spawn_shadow_sources(commands: &mut Commands, light: Vec3) {
         },
         Transform::default().looking_to(-light, Vec3::Y),
         bevy::light::CascadeShadowConfigBuilder {
-            maximum_distance: 100.,
+            num_cascades,
+            maximum_distance,
             first_cascade_far_bound: 10.,
             ..default()
         }

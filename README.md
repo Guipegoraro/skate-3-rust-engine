@@ -87,6 +87,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 **Graphics**
 - 16x anisotropic filtering on world textures.
 - Render scale up to 200% (supersampling), since MSAA stops at 8x.
+- Performance (SK-018): `scripts/Bench-Graphics.ps1` A/B benchmark with `SKATE_RENDER_SCALE`/`SKATE_MSAA`/`SKATE_FPS_LIMIT`/`SKATE_CHARACTER_SHADOW` overrides; the character shadow map uses 2 cascades to 40 m instead of 4 to 100 m. Results in [docs/performance.md](docs/performance.md).
 
 **Assets and tooling**
 - Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.

@@ -178,3 +178,32 @@ including changing culling, MSAA and internal resolution together. The explicit
 GPU lightmap cache regression test also passed. The startup
 image was visually inspected. Manual menu testing was interrupted by the user
 stopping Computer Use, so live UI toggling has not been visually verified.
+
+## Graphics A/B benchmark (SK-018)
+
+`scripts/Bench-Graphics.ps1 -Scales 100,200 -Msaa 1,4,8 [-Repeats 3] [-Sweep] [-Map <.skate>]`
+runs `bin/skate3rust.exe` once per scenario with `SKATE_PERF_REPORT`, uncapped FPS, and prints
+FPS, mean/p95/p99 frame time, main schedule and render submit/prepare times. Reports land in
+`logs/bench/<date>/`. The game must be closed. Overrides that do not touch `graphics.json`:
+`SKATE_RENDER_SCALE` (25..200), `SKATE_MSAA` (1/2/4/8), `SKATE_FPS_LIMIT` (0 = unlimited),
+`SKATE_OCCLUSION` (0/1) and `SKATE_CHARACTER_SHADOW=<cascades>x<metres>` (default `2x40`).
+`--trace-gpu` now reports shadow views as `shadow_directional_light` instead of `other_pass`.
+
+University spawn, stationary, RX 9060 XT, 1280 x 800, one run each (September 26, 2026):
+
+| Scale | MSAA | FPS | Mean ms | p95 ms | Main ms | Submit ms |
+|---|---|---|---|---|---|---|
+| 100% | 1 | 70.5* | 14.18 | 19.37 | 10.07 | 9.46 |
+| 100% | 4 | 99.1 | 10.10 | 13.35 | 7.14 | 7.35 |
+| 100% | 8 | 92.7 | 10.79 | 17.02 | 7.32 | 7.68 |
+| 200% | 1 | 113.6 | 8.80 | 11.59 | 6.26 | 6.52 |
+| 200% | 4 | 103.9 | 9.62 | 12.41 | 6.90 | 7.01 |
+| 200% | 8 | 85.3 | 11.72 | 18.19 | 7.81 | 7.92 |
+
+\* first run of the session; it includes warmup and is slower. Runs vary by about ±5 FPS.
+
+The frame is CPU bound: render scale barely matters, and main schedule plus render submit
+dominate. MSAA 8x costs about 10-20 FPS against 4x. The character-only shadow map went from
+4 cascades to 100 m to 2 cascades to 40 m: main schedule about 0.6 ms lower, FPS within noise
+(4x100: 112.6/114.1; 2x40: 118.3/107.4 at 200% MSAA 4x), skater shadow unchanged. Follow-up
+CPU work is SK-028.
