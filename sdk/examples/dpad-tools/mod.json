@@ -2,7 +2,7 @@
   "id": "guipegoraro.dpad-tools",
   "api": 1,
   "name": "D-pad Tools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "guipegoraro",
   "description": "Controller shortcuts. D-pad left saves a spot, right returns to it. D-pad up/down raises or lowers push speed (ignored while LB is held, which keeps the native session marker). Disable Native Trainer: only one mod can own trainer tuning.",
   "entry": "main.lua",
@@ -25,8 +25,8 @@
     "show_hud": {
       "type": "boolean",
       "label": "Show HUD",
-      "description": "Show the current push multiplier and D-pad hints on screen.",
-      "default": true
+      "description": "Show the current push multiplier and D-pad hints on screen. Short press notices still appear when off.",
+      "default": false
     }
   }
 }
