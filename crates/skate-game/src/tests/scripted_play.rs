@@ -180,3 +180,23 @@ fn recognized_kickflip_carries_pattern_geometry() {
     assert_eq!(recognized.name, "Kickflip");
     assert_eq!(recognized.points, kickflip.points);
 }
+
+/// Crash report 26/09: respawn after a bail at this University checkpoint went
+/// PhysicsGround -> PhysicsAir -> PhysicsGround and the board torque became NaN.
+#[test]
+#[ignore = "requires private stock assets and University.skate; bail checkpoint NaN"]
+fn university_bail_checkpoint_respawn_stays_finite() {
+    let assets = Assets::load();
+    let path = std::env::var_os("SK_MAP").expect("set SK_MAP to University.skate");
+    let mut map = skate_data::skate_map::SkateMap::load(std::path::Path::new(&path)).unwrap();
+    for i in 0..16 {
+        map.spawn = [375.8947, 125.11455, -713.6659];
+        map.heading = i as f32 * std::f32::consts::TAU / 16.;
+        let physics = GamePhysics::load_with_map(&assets.root, Some(&map)).unwrap();
+        let mut s = Session::new(&assets, physics, |_| {});
+        for _ in 0..240 {
+            s.step(0, [0; 2]).unwrap_or_else(|e| panic!("heading {}: {e}", map.heading));
+        }
+        eprintln!("CHECKPOINT heading {} ok state {:?}", map.heading, s.skater.player_state.current());
+    }
+}
