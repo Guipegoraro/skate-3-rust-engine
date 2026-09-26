@@ -1,4 +1,6 @@
 mod fps_overlay;
+mod hud_shapes;
+mod stick_hud;
 mod animation;
 mod crash_report;
 mod crash_context;
