@@ -309,11 +309,9 @@ fn jump_playback_with_tweak(throw_board: bool, tweak: bool) {
 #[test]
 #[ignore = "requires private stock assets; SK-025 run_speed sprint jump"]
 fn fast_run_speed_sprint_jump_stays_finite() {
+    use super::scripted_play::{Assets, Session, A, X, Y};
     let scale: f32 = std::env::var("SK025_SCALE").ok().and_then(|s| s.parse().ok()).unwrap_or(3.);
-    let root = std::env::var_os("SKATE3_ASSET_ROOT").expect("set SKATE3_ASSET_ROOT");
-    let root = std::path::Path::new(&root);
-    let assets = skate_data::GameAssets::load(root).unwrap();
-    let graphs = crate::graph_runtime::StockGraphs::load(root, &assets).unwrap();
+    let assets = Assets::load();
     // SK025_MAP=<University.skate>: start on the in-game crash slope, one run per heading.
     let mut map = std::env::var_os("SK025_MAP").map(|path| skate_data::skate_map::SkateMap::load(
         std::path::Path::new(&path)).unwrap());
@@ -326,49 +324,36 @@ fn fast_run_speed_sprint_jump_stays_finite() {
         for &heading in &headings {
             if let Some(map) = map.as_mut() { map.spawn = spawn; map.heading = heading; }
             eprintln!("SK025 spawn {spawn:?} heading {heading}");
-            let physics = GamePhysics::load_with_map(root, map.as_ref()).unwrap();
-            sprint_jump(root, &graphs, physics, scale);
+            let physics = GamePhysics::load_with_map(&assets.root, map.as_ref()).unwrap();
+            let mut s = Session::new(&assets, physics, |p| p.trainer.run_speed = scale);
+            let mut max_speed = 0f32;
+            while s.tick < 1800 {
+                let tick = s.tick;
+                // Y at 20 steps off; then A sprint with a slowly turning stick and X every 2 s.
+                let buttons = match tick {
+                    20 => Y,
+                    100.. if tick % 120 < 10 => A | X,
+                    100.. => A,
+                    _ => 0,
+                };
+                let angle = tick as f32 * 0.004;
+                let left = if tick >= 100 { [(angle.sin() * 32767.) as i16, (angle.cos() * 32767.) as i16] } else { [0; 2] };
+                s.step(buttons, left).unwrap_or_else(|e| panic!("scale {scale} max_speed={max_speed}: {e}"));
+                let velocity = s.skater.skeleton.record.centre_of_mass_velocity;
+                max_speed = max_speed.max((velocity[0].powi(2) + velocity[2].powi(2)).sqrt());
+                let motion = &s.skater.biped_ground.controller.state.motion;
+                assert!(motion.support_velocity_256[3].abs() < 1.0,
+                    "scale {scale} tick{tick}: support velocity w lane is growing: {:?}", motion.support_velocity_256);
+                if let Some(result) = &s.skater.biped_ground.result {
+                    let finite = result.velocity.iter().chain(result.position.iter()).all(|v| v.is_finite());
+                    assert!(finite, "scale {scale} tick{tick}: non-finite Ground result, max_speed={max_speed}: \
+                        velocity={:?} position={:?}", result.velocity, result.position);
+                }
+            }
+            eprintln!("SK025 scale={scale} max_speed={max_speed}");
         }
     }
 }
-
-fn sprint_jump(root: &std::path::Path, graphs: &crate::graph_runtime::StockGraphs, mut physics: GamePhysics, scale: f32) {
-    physics.trainer.run_speed = scale;
-    let mut skater = SkaterRuntime::load(root, &graphs, &physics, "normal").unwrap();
-    let mut controls = PlayerControls::default();
-    let mut input = crate::input::ControllerInput::default();
-    let mut camera = crate::camera::CameraRuntime::load(root).unwrap();
-    let mut max_speed = 0f32;
-    for tick in 0..1800 {
-        // Y at 20 steps off; then A sprint with a slowly turning stick and X every 2 s.
-        let buttons = match tick {
-            20 => 0x8000,
-            100.. if tick % 120 < 10 => 0x1000 | 0x4000,
-            100.. => 0x1000,
-            _ => 0,
-        };
-        let angle = tick as f32 * 0.004;
-        let left = if tick >= 100 { [(angle.sin() * 32767.) as i16, (angle.cos() * 32767.) as i16] } else { [0; 2] };
-        input.sample_raw_for_test(XboxState { buttons, triggers: [0; 2], left, right: [0; 2] });
-        let mut actions = input.player_actions();
-        controls.update_for_physics(&mut actions, &physics, &skater, &camera).unwrap();
-        let state = skater.player_state.current();
-        frame::advance(&mut physics, &mut skater, &mut controls, &graphs, &mut actions, true, &mut camera)
-            .unwrap_or_else(|e| panic!("scale {scale} tick{tick} {state:?} max_speed={max_speed}: {e}"));
-        let velocity = skater.skeleton.record.centre_of_mass_velocity;
-        max_speed = max_speed.max((velocity[0].powi(2) + velocity[2].powi(2)).sqrt());
-        let motion = &skater.biped_ground.controller.state.motion;
-        assert!(motion.support_velocity_256[3].abs() < 1.0,
-            "scale {scale} tick{tick}: support velocity w lane is growing: {:?}", motion.support_velocity_256);
-        if let Some(result) = &skater.biped_ground.result {
-            let finite = result.velocity.iter().chain(result.position.iter()).all(|v| v.is_finite());
-            assert!(finite, "scale {scale} tick{tick}: non-finite Ground result, max_speed={max_speed}: \
-                velocity={:?} position={:?}", result.velocity, result.position);
-        }
-    }
-    eprintln!("SK025 scale={scale} max_speed={max_speed}");
-}
-
 fn assert_released(physics: &GamePhysics, skater: &SkaterRuntime, tick: usize) {
     assert!(
         matches!(skater.skateboard_controller.fields.state_448, 2 | 3),

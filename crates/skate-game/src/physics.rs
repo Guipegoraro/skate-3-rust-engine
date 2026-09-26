@@ -40,6 +40,7 @@ mod animation_input;
 mod animation_phase;
 mod biped_ground;
 mod frame;
+mod gravity;
 mod grind;
 mod grind_air_settings;
 mod grind_camera;
@@ -116,6 +117,10 @@ pub(crate) struct GamePhysics {
     /// Toolkit ctor82C0680C clears8384bit7; wipeout entry/exit owns changes.
     pub board_wiping_out: bool,
     pub trainer: skate_mods::TrainerTuning,
+    /// Mod gravity multiplier (SK-004); 1.0 is stock.
+    pub gravity: f32,
+    /// Stock WorldGravity, scaled by `gravity` every tick.
+    base_gravity: skate_core::math::Vector3,
 }
 
 /// Cross-phase records for the current fixed tick. Subsystems retain their
@@ -269,6 +274,7 @@ impl GamePhysics {
     fn load_world_difficulty(asset_root: &std::path::Path, terrain: ground::Terrain, map: Option<&skate_data::skate_map::SkateMap>, difficulty: crate::difficulty::Difficulty) -> Result<Self, String> {
         let data = Collections::load(asset_root)?;
         let settings = PhysicsSettings::load(&data)?;
+        let base_gravity = settings.step.simulation.gravity_acceleration;
         let animation_profile = animation_phase::AnimationProfile::load(&data, difficulty.key())?;
         eprintln!(
             "SKATE_PHYSICS_MODE {} index={}",
@@ -345,6 +351,8 @@ impl GamePhysics {
             processed_flags_2468,
             board_wiping_out: false,
             trainer: Default::default(),
+            gravity: 1.0,
+            base_gravity,
         })
     }
 
@@ -592,6 +600,9 @@ mod offboard_midair_playback;
 #[path = "tests/offboard_recall_playback.rs"]
 mod offboard_recall_playback_tests;
 
+#[cfg(test)]
+#[path = "tests/scripted_play.rs"]
+pub(crate) mod scripted_play;
 #[cfg(test)]
 #[path = "tests/offboard_jump_playback.rs"]
 mod offboard_jump_playback_tests;

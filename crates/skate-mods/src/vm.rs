@@ -22,6 +22,10 @@ pub enum Command {
     Trainer {
         tuning: crate::TrainerTuning,
     },
+    /// World gravity multiplier, 0.25..2 (SK-004).
+    Gravity {
+        scale: f32,
+    },
     Log {
         text: String,
     },
@@ -58,6 +62,7 @@ impl Command {
             Self::VehicleControl{key,controls} => crate::schema::valid_id(key) && controls.valid(),
             Self::VehicleRemove{key}|Self::VehicleEnter{key}|Self::VehicleExit{key} => crate::schema::valid_id(key),
             Self::Trainer { tuning } => tuning.valid(),
+            Self::Gravity { scale } => scale.is_finite() && (0.25..=2.).contains(scale),
             Self::Animation { path } => !path.is_empty() && path.len() <= 256,
             Self::Log { text } => text.len() <= 2048,
             Self::Overlay { key, text } => crate::schema::valid_id(key) && text.len() <= 1024,

@@ -1,5 +1,6 @@
 //! Main-thread SDK adapter. Lua never receives World, entity IDs, or asset handles.
 mod menu;
+mod native_control;
 pub(crate) mod network;
 mod panel;
 pub(crate) mod vehicles;
@@ -14,7 +15,8 @@ use std::collections::BTreeMap;
 pub(crate) struct Mods {
     pub manager: Manager,
     animation_info: serde_json::Value,
-    trainer: Option<(String, skate_mods::TrainerTuning)>,
+    trainer: native_control::NativeControl<skate_mods::TrainerTuning>,
+    gravity: native_control::NativeControl<native_control::Gravity>,
     owned: BTreeMap<(String, String), Owned>,
     generation: u64,
     last_bail: bool,
@@ -72,7 +74,8 @@ impl Plugin for ModdingPlugin {
         let animation_info = json!({"bone_names":frames.bone_names,"slots":slots});
         app.insert_resource(Mods {
             animation_info,
-            trainer: None,
+            trainer: native_control::NativeControl::new("trainer"),
+            gravity: native_control::NativeControl::new("gravity"),
             manager: Manager::new(root, settings),
             owned: BTreeMap::new(),
             generation: u64::MAX,
@@ -223,15 +226,11 @@ fn retire(world: &mut World, mods: &mut Mods, key: &(String, String)) {
 }
 fn apply(world: &mut World, mods: &mut Mods) {
     let retired = std::mem::take(&mut mods.manager.retired);
-    if mods
-        .trainer
-        .as_ref()
-        .is_some_and(|(id, _)| retired.contains(id))
-    {
-        mods.trainer = None;
+    for id in &retired {
+        mods.trainer.release(id);
+        mods.gravity.release(id);
     }
-    world.resource_mut::<crate::physics::GamePhysics>().trainer =
-        mods.trainer.as_ref().map(|(_, t)| *t).unwrap_or_default();
+    sync_native(world, mods);
     for id in &retired {
         network::retire(world,id);
         vehicles::retire(world, id);
@@ -303,10 +302,9 @@ fn apply(world: &mut World, mods: &mut Mods) {
             warn!("Lua mod {id}: {e}");
             mods.manager.fail(&id, e);
             vehicles::retire(world, &id);
-            if mods.trainer.as_ref().is_some_and(|(owner, _)| owner == &id) {
-                mods.trainer = None;
-                world.resource_mut::<crate::physics::GamePhysics>().trainer = Default::default();
-            }
+            mods.trainer.release(&id);
+            mods.gravity.release(&id);
+            sync_native(world, mods);
             world
                 .resource::<crate::physics::SkaterRuntime>()
                 .animation
@@ -331,6 +329,12 @@ fn apply(world: &mut World, mods: &mut Mods) {
             row += 1;
         }
     }
+}
+/// Pushes the owned native controls (or their stock defaults) into the physics.
+fn sync_native(world: &mut World, mods: &Mods) {
+    let mut physics = world.resource_mut::<crate::physics::GamePhysics>();
+    physics.trainer = mods.trainer.value();
+    physics.gravity = mods.gravity.value().0;
 }
 fn teleport_ready(world: &World) -> Result<(), String> {
     if world.resource::<vehicles::Vehicles>().occupied() { return Err("Exit the vehicle before teleporting the skater".into()); }
@@ -372,11 +376,12 @@ fn apply_one(world: &mut World, mods: &mut Mods, id: &str, command: Command) -> 
             vehicles::command(world, &mods.manager.packages[id].root, id, command)?;
         }
         Command::Trainer { tuning } => {
-            if mods.trainer.as_ref().is_some_and(|(owner, _)| owner != id) {
-                return Err("Native trainer controls are already owned by another mod".into());
-            }
-            mods.trainer = Some((id.to_owned(), tuning));
-            world.resource_mut::<crate::physics::GamePhysics>().trainer = tuning;
+            mods.trainer.claim(id, tuning)?;
+            sync_native(world, mods);
+        }
+        Command::Gravity { scale } => {
+            mods.gravity.claim(id, native_control::Gravity(scale))?;
+            sync_native(world, mods);
         }
         Command::Animation { path } => {
             let root = &mods.manager.packages[id].root;

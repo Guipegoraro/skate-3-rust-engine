@@ -74,6 +74,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
   - D-pad up/down changes push speed on the board and running speed on foot.
   - Its window starts collapsed and its HUD starts hidden.
 - `sdk.trainer.apply` has a new `run_speed` field (0.25..4) that scales on-foot walk, run and sprint speed (SK-025).
+- `sdk.physics.gravity(scale)` changes world gravity for mods (0.25..2), with its own owner; resets when the mod stops (SK-004).
 - Mod manifests can set `start_collapsed` so the mod's settings window opens minimized.
 - Fixed the native action IDs listed in [docs/lua-modding.md](docs/lua-modding.md).
 
@@ -84,6 +85,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 **Assets and tooling**
 - Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.
 - Bevy Remote Protocol behind the `brp` feature, for live inspection.
+- Scripted play test harness (`crates/skate-game/src/tests/scripted_play.rs`) that drives the physics from a raw controller script; notes in [docs/testing-notes.md](docs/testing-notes.md).
 
 **Fixes**
 - On-foot crash after landing (SK-025): a leftover 4th (w) component in the skater's position fed back through the moving-support velocity and doubled every tick until the physics failed. Faster running made it more likely. The support velocity now has no w component.

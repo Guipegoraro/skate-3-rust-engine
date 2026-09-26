@@ -223,6 +223,13 @@ impl GroundSettings {
         result.drag.balance_drag *= tuning.manual_drag;
         result
     }
+    /// SK-004 mod gravity: the speed model's slope gravity follows the world multiplier.
+    pub fn with_gravity(&self, scale: f32) -> Self {
+        let mut result = self.clone();
+        result.speed.gravity *= scale;
+        result.speed.maximum_gravity_acceleration *= scale;
+        result
+    }
     pub fn board(&self) -> GroundBoardSettings<'_> {
         GroundBoardSettings {
             steering: &self.steering,

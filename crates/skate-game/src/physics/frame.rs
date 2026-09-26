@@ -83,6 +83,7 @@ pub(super) fn advance(
     if physics.trainer != skate_mods::TrainerTuning::default() {
         skater.ground_settings = std::sync::Arc::new(skater.ground_settings.tuned(physics.trainer));
     }
+    super::gravity::apply(physics, skater);
     let mut vehicle_ejected = false;
     if teleported {
         skater.respawn.reset_measurements();

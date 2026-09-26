@@ -1,0 +1,37 @@
+# Testing notes
+
+Running log of what works for testing gameplay changes without playing by hand.
+Add to it whenever a test teaches something new.
+
+## Scripted play harness (`crates/skate-game/src/tests/scripted_play.rs`)
+
+- `Assets::load()` reads stock assets once; `Session::flat(&assets, |physics| ...)` or
+  `Session::new(&assets, GamePhysics::load_with_map(root, Some(&map))?, ...)` builds one skater.
+  The closure configures the physics before the skater loads (trainer, gravity, ...).
+- `session.step(buttons, left_stick)` runs one full 60 Hz tick from a raw XInput state.
+  Button constants: `A` (sprint on foot), `X` (jump), `Y` (step off / on the board).
+- Read state straight from `session.skater` / `session.physics`, e.g. `root_position()`.
+- Tests are `#[ignore]` because they need the private assets. Run:
+  ```powershell
+  $env:SKATE3_ASSET_ROOT="$PWD\assets"
+  cargo test --locked -p skate-game --bin skate3rust -- --ignored --nocapture <test name>
+  ```
+  `SKATE3_ASSET_ROOT` must be absolute: the test's working directory is the crate folder.
+- Asset loading is ~5 s per session, so several sessions per test are fine.
+
+## Patterns
+
+- **Compare against stock, not absolute numbers**: run the same script with the default and the
+  modified setting and assert the ratio (SK-004: half gravity, jump 1.04 m → 1.93 m).
+- **On foot from spawn**: tap `Y` at tick 20, then wait until ~tick 120 before scripting moves.
+- **Map-specific bugs**: the flat test world is small; the skater runs off it within seconds.
+  Load the real map with `SkateMap::load` and set `map.spawn` / `map.heading` to where the bug
+  happened (SK-025). `SkateMap` is not `Clone`: mutate it in place between runs.
+- **Blow-ups (NaN/inf)**: assert on the first lane that grows, not only on "finite", to find the
+  feedback loop early (SK-025: the support velocity `w` lane).
+
+## Live game (BRP)
+
+- The game serves Bevy Remote Protocol on port 15703 (`.local/play.cmd`). Only `Reflect`
+  types are visible; `GamePhysics` is not, so physics checks belong in the scripted harness.
+- Screenshots via BRP are the check for HUD/menu changes.

@@ -235,6 +235,12 @@ offboard_jump, grip, turn_power, manual_drag and run_speed (0.25..4), and wobble
 Disable/reload/fault restores defaults; native contact/state conditions still apply.
 These are parameter multipliers, not guarantees of measured speed or height.
 
+`sdk.physics.gravity(scale)` multiplies world gravity (0.25..2; 1 is stock). It has its own
+owner, separate from the trainer, and resets on disable/reload/fault. It scales WorldGravity
+(integrator and trajectory predictions), the processed-input gravity (ollie velocity, early air)
+and the ground speed model's slope gravity. A few fixed -9.8 constants in board air, biped,
+handplant and grind-air paths still use stock gravity. Half gravity roughly doubles an on-foot jump.
+
 `sdk/examples/native-trainer` demonstrates tuning, HUD text, checkpoints, timers,
 breadcrumbs, beacons and configurable shortcuts. Defaults: F5 save checkpoint, F6 return,
 F7 stopwatch, F8 clear transient data, F9 beacon. Its text data stays in the package.

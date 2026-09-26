@@ -112,6 +112,10 @@ sdk.trainer = {}
 ---@param tuning TrainerTuning Owned, reversible native tuning. Conflicting owner is rejected.
 function sdk.trainer.apply(tuning) end
 
+sdk.physics = {}
+---@param scale number World gravity multiplier 0.25..2; 1 restores stock. One owner at a time; reset on disable/fault.
+function sdk.physics.gravity(scale) end
+
 ---@class VehicleControls
 ---@field pitch? number -1..1; airborne nose up to nose down (left stick vertical)
 ---@field throttle? number -1..1, reverse to forward
