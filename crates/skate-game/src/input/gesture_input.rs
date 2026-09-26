@@ -11,6 +11,17 @@ pub(crate) struct GestureInput {
     recognizers: Vec<(usize, Recognizer)>,
     maximum_misses: [u8; 2],
     held_pattern: Option<String>,
+    /// Last permitted right-stick trick, for the stick HUD (SK-027).
+    pub recognized: Recognized,
+}
+
+/// A recognized right-stick pattern: its ideal key points (x right, y down, stick units).
+#[derive(Clone, Default)]
+pub(crate) struct Recognized {
+    /// Increments on every recognition, so the HUD can tell a repeat of the same trick.
+    pub count: u64,
+    pub name: String,
+    pub points: Vec<[f32; 2]>,
 }
 impl GestureInput {
     pub fn load(root: &Path) -> Result<Self, String> {
@@ -45,6 +56,7 @@ impl GestureInput {
             recognizers,
             maximum_misses: [misses("left_stick")?, misses("right_stick")?],
             held_pattern: None,
+            recognized: Recognized::default(),
         })
     }
 
@@ -86,15 +98,24 @@ impl GestureInput {
                     {
                         self.held_pattern = Some(name.clone());
                     }
-                    events.push((name, result.strength));
+                    // Geometry by index: names repeat within a file (alternate paths).
+                    let points = recognizer.patterns()[result.pattern].points.clone();
+                    events.push((name, result.strength, stick, points));
                 }
             }
         }
         if held {
             ag.insert("HoldPattern", 1.0);
         }
-        for (name, strength) in events {
+        let mut shown = false;
+        for (name, strength, stick, points) in events {
             if permitted(&name, flags, physical_state, ag) {
+                // Several files can match one flick (e.g. skater.pat and skater_fingerflip.pat);
+                // the HUD shows the first in the original insertion order.
+                if stick == 1 && !shown {
+                    shown = true;
+                    self.recognized = Recognized { count: self.recognized.count + 1, name: name.clone(), points };
+                }
                 ag.insert("Trick", 1.0);
                 ag.insert(&name, 1.0);
                 ag.insert("GestureSpeed", strength);

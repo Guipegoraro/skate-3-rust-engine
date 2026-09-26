@@ -14,6 +14,9 @@ const STEP: f32 = 1.5;
 const HOLD_SECONDS: f32 = 1.0;
 const FADE_SECONDS: f32 = 0.5;
 const LINE_COLOR: Vec3 = Vec3::new(0.55, 0.85, 1.0);
+// Recognized trick (SK-027): the pattern's ideal path in amber, plus the trick name.
+const IDEAL_COLOR: Vec3 = Vec3::new(1.0, 0.72, 0.2);
+const IDEAL_POINTS: usize = 16;
 // Right stick X/Y in the published 18-action array (native actions 67/68).
 const RIGHT_X: usize = 3;
 const RIGHT_Y: usize = 4;
@@ -26,6 +29,36 @@ struct StickRoot;
 struct StickDot;
 #[derive(Component)]
 struct LinePiece(usize);
+#[derive(Component)]
+struct IdealPiece(usize);
+#[derive(Component)]
+struct TrickName;
+
+/// Last recognition shown: its count and seconds since it arrived.
+#[derive(Default)]
+struct Ideal {
+    count: u64,
+    age: f32,
+    points: Vec<Vec2>,
+}
+impl Ideal {
+    fn alpha(&self) -> f32 {
+        if self.points.is_empty() {
+            return 0.0;
+        }
+        1.0 - ((self.age - HOLD_SECONDS) / FADE_SECONDS).clamp(0.0, 1.0)
+    }
+}
+
+/// Pattern key points (stick units, y down) to indicator pixels, starting from rest.
+fn ideal_path(points: &[[f32; 2]]) -> Vec<Vec2> {
+    let centre = Vec2::splat(SIZE * 0.5);
+    let reach = (SIZE - DOT) * 0.5;
+    std::iter::once(centre)
+        .chain(points.iter().map(|&[x, y]| centre + Vec2::new(x, y).clamp_length_max(1.0) * reach))
+        .take(IDEAL_POINTS)
+        .collect()
+}
 
 /// The current (or last) flick path in indicator pixels.
 #[derive(Default)]
@@ -122,9 +155,26 @@ fn spawn(
                 parent.spawn(centred(ring(SIZE * 0.3, 1.5, Color::srgba(1.0, 1.0, 1.0, 0.35)), centre));
             }
         }
+        for index in 0..IDEAL_POINTS - 1 {
+            parent.spawn((IdealPiece(index), segment(LINE + 1.0, Color::NONE)));
+        }
         for index in 0..MAX_POINTS - 1 {
             parent.spawn((LinePiece(index), segment(LINE, Color::NONE)));
         }
+        parent.spawn((
+            TrickName,
+            Text::new(""),
+            TextFont { font_size: 18.0, ..default() },
+            TextColor(Color::NONE),
+            TextLayout::new_with_justify(Justify::Center),
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(SIZE + 4.0),
+                left: px(-SIZE),
+                width: px(SIZE * 3.0),
+                ..default()
+            },
+        ));
         parent.spawn((StickDot, centred(disc(DOT, Color::WHITE), centre)));
     });
 }
@@ -136,9 +186,13 @@ fn update(
     menu: Option<Res<crate::graphics_menu::Menu>>,
     replay: Res<crate::replay::Replay>,
     mut stroke: Local<Stroke>,
+    mut ideal: Local<Ideal>,
+    controls: Res<crate::physics::PlayerControls>,
     mut root: Query<&mut Visibility, With<StickRoot>>,
-    mut dot: Query<&mut Node, (With<StickDot>, Without<LinePiece>)>,
-    mut pieces: Query<(&LinePiece, &mut Node, &mut UiTransform, &mut BackgroundColor), Without<StickDot>>,
+    mut dot: Query<&mut Node, (With<StickDot>, Without<LinePiece>, Without<IdealPiece>, Without<TrickName>)>,
+    mut pieces: Query<(&LinePiece, &mut Node, &mut UiTransform, &mut BackgroundColor), (Without<StickDot>, Without<IdealPiece>)>,
+    mut ideal_pieces: Query<(&IdealPiece, &mut Node, &mut UiTransform, &mut BackgroundColor), (Without<StickDot>, Without<LinePiece>)>,
+    mut name: Query<(&mut Text, &mut TextColor), With<TrickName>>,
 ) {
     let visible = options.stick_indicator && crate::graphics_menu::gameplay_active(menu) && !replay.active;
     for mut visibility in &mut root {
@@ -146,6 +200,7 @@ fn update(
     }
     if !visible {
         *stroke = Stroke::default();
+        ideal.points.clear();
         return;
     }
     let values = *input.0.actions().values();
@@ -169,11 +224,56 @@ fn update(
             _ => node.display = Display::None,
         }
     }
+
+    ideal.age += time.delta_secs();
+    if let Some(recognized) = controls.recognized_gesture() {
+        if recognized.count != ideal.count {
+            ideal.count = recognized.count;
+            ideal.age = 0.0;
+            ideal.points = ideal_path(&recognized.points);
+            for (mut text, _) in &mut name {
+                text.0 = recognized.name.replace('_', " ");
+            }
+        }
+    }
+    let alpha = ideal.alpha();
+    if alpha <= 0.0 {
+        ideal.points.clear();
+    }
+    let amber = Color::srgba(IDEAL_COLOR.x, IDEAL_COLOR.y, IDEAL_COLOR.z, 0.9 * alpha);
+    for (_, mut color) in &mut name {
+        color.0 = amber;
+    }
+    for (IdealPiece(index), mut node, mut transform, mut background) in &mut ideal_pieces {
+        match (ideal.points.get(*index), ideal.points.get(index + 1)) {
+            (Some(&from), Some(&to)) => {
+                node.display = Display::Flex;
+                span(&mut node, &mut transform, from, to);
+                background.0 = amber;
+            }
+            _ => node.display = Display::None,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ideal_path_starts_at_rest_and_fades_with_the_stroke() {
+        let centre = Vec2::splat(SIZE * 0.5);
+        let reach = (SIZE - DOT) * 0.5;
+        let path = ideal_path(&[[0.0, 1.0], [1.0, -1.0]]);
+        assert_eq!(path[0], centre);
+        assert_eq!(path[1], centre + Vec2::new(0.0, reach));
+        // Diagonal key points stay on the ring.
+        assert!((path[2].distance(centre) - reach).abs() < 1e-3);
+        let mut ideal = Ideal { count: 1, age: 0.0, points: path };
+        assert_eq!(ideal.alpha(), 1.0);
+        ideal.age = HOLD_SECONDS + FADE_SECONDS;
+        assert_eq!(ideal.alpha(), 0.0);
+    }
     #[test]
     fn stroke_starts_at_centre_holds_then_clears() {
         let centre = Vec2::splat(SIZE * 0.5);

@@ -21,6 +21,11 @@ Add to it whenever a test teaches something new.
 
 ## Patterns
 
+- **Tricks from the stock patterns**: load the `.pat` file (`skate_data::gesture_patterns::load`), walk the
+  pattern's key points with `step_sticks` (`stick_from_pattern` converts to XInput), then read
+  `session.controls.recognized_gesture()` (SK-027). The harness calls `publish_gestures` like the
+  game's `controls::sample` system; without it no trick is ever recognized.
+
 - **Compare against stock, not absolute numbers**: run the same script with the default and the
   modified setting and assert the ratio (SK-004: half gravity, jump 1.04 m → 1.93 m).
 - **On foot from spawn**: tap `Y` at tick 20, then wait until ~tick 120 before scripting moves.

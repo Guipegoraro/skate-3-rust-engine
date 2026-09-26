@@ -120,6 +120,11 @@ impl PlayerControls {
         })
     }
 
+    /// Last recognized right-stick trick (SK-027 stick HUD).
+    pub fn recognized_gesture(&self) -> Option<&crate::input::gesture_input::Recognized> {
+        self.gestures.as_ref().map(|g| &g.recognized)
+    }
+
     pub fn publish_gestures(&mut self, difficulty: u32, physical_state: u32) {
         if let Some(gestures) = &mut self.gestures {
             let words = self.controller.words();

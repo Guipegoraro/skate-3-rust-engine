@@ -28,7 +28,7 @@ pub(crate) struct Session<'a> {
     pub physics: GamePhysics,
     pub skater: SkaterRuntime,
     pub tick: usize,
-    controls: PlayerControls,
+    pub controls: PlayerControls,
     input: crate::input::ControllerInput,
     camera: crate::camera::CameraRuntime,
     graphs: &'a crate::graph_runtime::StockGraphs,
@@ -43,7 +43,7 @@ impl<'a> Session<'a> {
             physics,
             skater,
             tick: 0,
-            controls: PlayerControls::default(),
+            controls: PlayerControls::load(&assets.root).unwrap(),
             input: Default::default(),
             camera: crate::camera::CameraRuntime::load(&assets.root).unwrap(),
             graphs: &assets.graphs,
@@ -54,11 +54,20 @@ impl<'a> Session<'a> {
         Self::new(assets, GamePhysics::load(&assets.root).unwrap(), configure)
     }
     pub fn step(&mut self, buttons: u16, left: [i16; 2]) -> Result<(), String> {
-        self.input.sample_raw_for_test(XboxState { buttons, triggers: [0; 2], left, right: [0; 2] });
+        self.step_sticks(buttons, left, [0; 2])
+    }
+    /// Sticks in raw XInput units (y up).
+    pub fn step_sticks(&mut self, buttons: u16, left: [i16; 2], right: [i16; 2]) -> Result<(), String> {
+        self.input.sample_raw_for_test(XboxState { buttons, triggers: [0; 2], left, right });
         let mut actions = self.input.player_actions();
         self.controls
             .update_for_physics(&mut actions, &self.physics, &self.skater, &self.camera)
             .map_err(|e| e.to_string())?;
+        // Same order as the game's controls::sample system.
+        self.controls.publish_gestures(
+            self.physics.animation_profile.physics_mode,
+            self.skater.player_input.physical.state.state_16,
+        );
         frame::advance(
             &mut self.physics,
             &mut self.skater,
@@ -133,4 +142,41 @@ fn mod_impulse_changes_riding_velocity_only() {
     crate::physics::impulse::queue(&mut s.physics, [8., 0., 0.]);
     s.step(0, [0; 2]).unwrap();
     assert!(s.physics.pending_impulse.is_none());
+}
+
+/// Right-stick XInput value from pattern space (x right, y down, -1..1).
+pub(crate) fn stick_from_pattern([x, y]: [f32; 2]) -> [i16; 2] {
+    [(x.clamp(-1., 1.) * 32767.) as i16, (-y.clamp(-1., 1.) * 32767.) as i16]
+}
+
+/// SK-027: flicking the stock Kickflip pattern records its name and ideal geometry for the HUD.
+#[test]
+#[ignore = "requires private stock assets; SK-027 recognized gesture"]
+fn recognized_kickflip_carries_pattern_geometry() {
+    let assets = Assets::load();
+    let patterns = skate_data::gesture_patterns::load(
+        &assets.root.join("private/stock/data/joystick/skater.pat")).unwrap();
+    let kickflip = patterns.iter().find(|p| p.name == "Kickflip").expect("Kickflip pattern");
+    let mut s = Session::flat(&assets, |_| {});
+    for _ in 0..60 {
+        s.step(0, [0; 2]).unwrap();
+    }
+    // Walk the key points, a few ticks on each, then release.
+    let mut path = vec![[0., 0.]];
+    path.extend(kickflip.points.iter().copied());
+    for window in path.windows(2) {
+        for k in 1..=4 {
+            let t = k as f32 / 4.;
+            let p = [window[0][0] + (window[1][0] - window[0][0]) * t, window[0][1] + (window[1][1] - window[0][1]) * t];
+            s.step_sticks(0, [0; 2], stick_from_pattern(p)).unwrap();
+        }
+    }
+    for _ in 0..10 {
+        s.step(0, [0; 2]).unwrap();
+    }
+    let recognized = s.controls.recognized_gesture().expect("gesture input loaded");
+    eprintln!("SK027 recognized {} x{} points {:?}", recognized.name, recognized.count, recognized.points);
+    assert!(recognized.count > 0, "no right-stick trick recognized for {:?}", kickflip.points);
+    assert_eq!(recognized.name, "Kickflip");
+    assert_eq!(recognized.points, kickflip.points);
 }
