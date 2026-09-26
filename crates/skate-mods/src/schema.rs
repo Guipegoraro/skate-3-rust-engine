@@ -151,6 +151,8 @@ pub struct TrainerTuning {
     pub grip: f32,
     pub turn_power: f32,
     pub manual_drag: f32,
+    /// On-foot walk/run/sprint target speed.
+    pub run_speed: f32,
     pub hold_fakie: bool,
 }
 impl Default for TrainerTuning {
@@ -167,6 +169,7 @@ impl Default for TrainerTuning {
             grip: 1.,
             turn_power: 1.,
             manual_drag: 1.,
+            run_speed: 1.,
             hold_fakie: false,
         }
     }
@@ -184,6 +187,7 @@ impl TrainerTuning {
             self.grip,
             self.turn_power,
             self.manual_drag,
+            self.run_speed,
         ]
         .into_iter()
         .all(|v| v.is_finite() && (0.25..=4.).contains(&v))

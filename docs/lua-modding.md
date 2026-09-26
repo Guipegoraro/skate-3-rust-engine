@@ -229,7 +229,8 @@ paths and expansion limits. Validate in-game behaviour manually after the headle
 `sdk.trainer.apply(tuning)` installs one owner's reversible native tuning. Only one mod
 can own it at a time. Numeric fields default to 1 on each call; `hold_fakie` defaults false.
 Supported multipliers are pop, grind_pop, push_speed, push_power, braking, steering,
-offboard_jump, grip, turn_power and manual_drag (0.25..4), and wobble (0..2).
+offboard_jump, grip, turn_power, manual_drag and run_speed (0.25..4), and wobble (0..2).
+`run_speed` scales the on-foot walk/run/sprint target speeds; the step cadence follows the speed.
 `hold_fakie=true` suppresses the automatic stance switch. Unknown/nonfinite values fail.
 Disable/reload/fault restores defaults; native contact/state conditions still apply.
 These are parameter multipliers, not guarantees of measured speed or height.

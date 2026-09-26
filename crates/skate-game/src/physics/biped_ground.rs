@@ -22,6 +22,8 @@ pub(crate) struct Owner {
     air_launch: skate_core::player::offboard::air_launch::Settings,
     collision_settings: skate_core::player::offboard::ground_lifecycle::CollisionSettings,
     pub grab_settings: skate_core::player::offboard::ground_sync::BoardSettings,
+    /// Stock (normal, sprint) target-speed curves; trainer run_speed scales copies of them.
+    stock_speed: (skate_core::point_graph::PointGraph<16>, skate_core::point_graph::PointGraph<4>),
 }
 
 impl Owner {
@@ -66,6 +68,8 @@ impl Owner {
             turn_vs_stick_angle,
             air_launch,
         ) = settings.into_controller_parts();
+        let intent = &controller_settings.movement_intent;
+        let stock_speed = (intent.normal_speed, intent.sprint_speed);
         Ok(Self {
             controller: skate_core::player::offboard::controller::Controller::new(
                 controller_settings,
@@ -82,7 +86,17 @@ impl Owner {
             air_launch,
             collision_settings: lifecycle::load_collision_settings(data)?,
             grab_settings,
+            stock_speed,
         })
+    }
+
+    /// Trainer run_speed: scale the walk/run/sprint target speeds from stock every tick.
+    /// Cadence follows the physical speed, so the step animation keeps pace.
+    fn apply_run_speed(&mut self, scale: f32) {
+        let intent = &mut self.controller.settings.movement_intent;
+        let (normal, sprint) = self.stock_speed;
+        intent.normal_speed.y = normal.y.map(|speed| speed * scale);
+        intent.sprint_speed.y = sprint.y.map(|speed| speed * scale);
     }
 
     pub(crate) fn reset(&mut self, toolkit: &mut contact_toolkit::Owner) {
@@ -270,6 +284,7 @@ pub(crate) fn update(
         |input| Ok::<_, String>(owner.geometry.consume(input)),
     )?;
     owner.geometry_adjustment = Some(job.geometry);
+    owner.apply_run_speed(physics.trainer.run_speed);
     let result = owner.run(job.job);
     if result
         .physical_frame

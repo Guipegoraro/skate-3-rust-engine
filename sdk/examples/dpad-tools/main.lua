@@ -28,9 +28,9 @@ local function poll_bindings()
     held = now
 end
 
--- Mod state.
-local MIN_PUSH, MAX_PUSH = 0.25, 4
-local push, spot = 1, nil
+-- Mod state. Up/down change push speed on the board and running speed on foot.
+local MIN_SPEED, MAX_PUSH, MAX_RUN = 0.25, 4, 3
+local push, run, spot = 1, 1, nil
 
 local function notice(text)
     sdk.ui.text('notice', text)
@@ -40,22 +40,30 @@ local function draw()
     if not sdk.settings.show_hud then
         sdk.scene.remove('hud'); sdk.scene.remove('hint'); return
     end
-    sdk.ui.text('hud', string.format('REMADA %.2fx%s', push, spot and ' | spot salvo' or ''))
-    sdk.ui.text('hint', 'D-pad: < salvar  > voltar  ^ remada+  v remada-')
+    sdk.ui.text('hud', string.format('REMADA %.2fx | CORRIDA %.2fx%s', push, run, spot and ' | spot salvo' or ''))
+    sdk.ui.text('hint', 'D-pad: < salvar  > voltar  ^ v velocidade (remada no skate, corrida a pe)')
 end
 local function apply()
-    sdk.trainer.apply({push_speed = push, push_power = sdk.settings.push_power and push or 1})
+    -- Trainer fields left out reset to 1, so always send every field this mod owns.
+    sdk.trainer.apply({push_speed = push, push_power = sdk.settings.push_power and push or 1, run_speed = run})
     draw()
 end
-local function change_push(direction)
-    local next_push = math.max(MIN_PUSH, math.min(MAX_PUSH, push + direction * sdk.settings.push_step))
-    if next_push == push then
-        notice(direction > 0 and 'Remada ja no maximo (4x)' or 'Remada ja no minimo (0.25x)')
+local function step(value, direction, max)
+    return math.max(MIN_SPEED, math.min(max, value + direction * sdk.settings.push_step))
+end
+local function change_speed(direction)
+    local on_board = sdk.player.read().on_board
+    local label, value, max = 'Remada', push, MAX_PUSH
+    if not on_board then label, value, max = 'Corrida', run, MAX_RUN end
+    local next_value = step(value, direction, max)
+    if next_value == value then
+        notice(string.format(direction > 0 and '%s ja no maximo (%gx)' or '%s ja no minimo (%gx)',
+            label, direction > 0 and max or MIN_SPEED))
         return
     end
-    push = next_push
+    if on_board then push = next_value else run = next_value end
     apply()
-    notice(string.format('Remada %.2fx', push))
+    notice(string.format('%s %.2fx', label, next_value))
 end
 local function busy(p)
     return p.bailing or p.state == 702
@@ -78,8 +86,8 @@ end
 
 bind(pad.LEFT, save_spot)
 bind(pad.RIGHT, return_to_spot)
-bind(pad.UP, function() change_push(1) end, {pad.LB})
-bind(pad.DOWN, function() change_push(-1) end, {pad.LB})
+bind(pad.UP, function() change_speed(1) end, {pad.LB})
+bind(pad.DOWN, function() change_speed(-1) end, {pad.LB})
 
 return {
     on_load = function() apply(); notice('D-pad Tools pronto') end,

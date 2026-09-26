@@ -107,6 +107,7 @@ function sdk.animation.replace(path) end
 ---@field turn_power? number 0.25..4, native heading turn strength.
 ---@field hold_fakie? boolean Defaults false; suppress automatic fakie stance switching.
 ---@field manual_drag? number 0.25..4, manual balance linear drag.
+---@field run_speed? number 0.25..4, on-foot walk/run/sprint target speed.
 sdk.trainer = {}
 ---@param tuning TrainerTuning Owned, reversible native tuning. Conflicting owner is rejected.
 function sdk.trainer.apply(tuning) end

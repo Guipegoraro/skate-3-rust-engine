@@ -294,6 +294,8 @@ fn trainer_commands_validate_and_follow_settings() {
         }
         .valid()
     );
+    assert!(TrainerTuning { run_speed: 2., ..Default::default() }.valid());
+    assert!(!TrainerTuning { run_speed: 5., ..Default::default() }.valid());
     m.enable("example", false).unwrap();
     assert!(m.retired.contains(&"example".into()));
 }
