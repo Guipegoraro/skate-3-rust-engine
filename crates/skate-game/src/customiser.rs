@@ -239,8 +239,14 @@ impl Plugin for CustomiserPlugin {
             );
     }
 }
-pub(crate) fn navigation(mut nav: ResMut<Navigation>, time: Res<Time<Real>>, keys: Res<ButtonInput<KeyCode>>) {
-    let pad = (0..4).find_map(|i| crate::input::platform::poll(i).ok());
+pub(crate) fn navigation(mut nav: ResMut<Navigation>, time: Res<Time<Real>>, keys: Res<ButtonInput<KeyCode>>, config: Res<crate::config::Config>, net: Option<Res<crate::multiplayer::Multiplayer>>, windows: Query<&Window>) {
+    // Two instances side by side (SK-002): menus follow this window's own controller,
+    // or, in multiplayer without --controller, only the focused window reads the pads.
+    let pad = match config.multiplayer.controller {
+        Some(slot) => crate::input::platform::poll(slot as usize).ok(),
+        None if net.is_some_and(|n| n.active()) && !windows.iter().any(|w| w.focused) => None,
+        None => (0..4).find_map(|i| crate::input::platform::poll(i).ok()),
+    };
     // Remap outside the dead zone so a resting stick cannot drift the preview.
     let axis = pad.as_ref().map_or(0., |p| (p.state.right[0] as f32 / 32767.).clamp(-1., 1.));
     nav.preview_turn = axis.signum() * ((axis.abs() - 0.24) / 0.76).max(0.);

@@ -43,3 +43,5 @@ Add to it whenever a test teaches something new.
 - The game serves Bevy Remote Protocol on port 15703 (`.local/play.cmd`). Only `Reflect`
   types are visible; `GamePhysics` is not, so physics checks belong in the scripted harness.
 - Screenshots via BRP are the check for HUD/menu changes.
+- Two instances (SK-002): `.local/play-2p.cmd` gives BRP 15703 (player 1) and 15704 (player 2); screenshot each port. Window rectangles can be read with Win32 `GetWindowRect` after `SetProcessDPIAware` (physical pixels). Launch detached (`Start-Process`) or the tool call waits on the games' output pipes.
+- The first BRP connection right after launch can fail while the port is not yet listening; wait for `netstat` to show it LISTENING.

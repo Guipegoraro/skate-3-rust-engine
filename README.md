@@ -65,6 +65,10 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - **Game options** page in the pause menu (Right-stick indicator, Fly mode), saved to `settings/game-options.json`.
 - **Fly / noclip mode** (SK-026): press **B** (or F3) while on foot. Use the left stick to move, LB/RB to go down/up, and B again to land. Physics is paused while flying.
 
+- **Two players side by side** (SK-002): `scripts/Launch-TwoPlayers.ps1` starts a host and a guest over local direct multiplayer, each borderless on one half of the primary monitor and tied to its own controller (BRP ports 15703/15704, logs in `logs/2p/`). Options: `-Windowed`, `-Release`, `-MapPath`.
+- New launch flags `--window X Y WIDTH HEIGHT` and `--borderless`.
+- In multiplayer, menus read only the window's own controller (`--controller`), or only the focused window without it.
+
 **HUD**
 - **Right-stick indicator** at the bottom centre. It uses the original Trick Analyzer ring and draws a line along each flick that fades after the trick.
 

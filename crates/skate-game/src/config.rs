@@ -13,6 +13,10 @@ pub(crate) struct Config {
     pub multiplayer: crate::multiplayer::Options,
     pub map_fingerprint: u64,
     pub teleport: Option<String>,
+    /// `--window X Y W H`: fixed window rectangle in physical pixels (SK-002 side by side).
+    pub window: Option<[i32; 4]>,
+    /// `--borderless`: no title bar or border.
+    pub borderless: bool,
 }
 
 impl Config {
@@ -28,6 +32,8 @@ impl Config {
             multiplayer: crate::multiplayer::Options::default(),
             map_fingerprint: 0,
             teleport: None,
+            window: None,
+            borderless: false,
         };
         let mut difficulty_override = None;
         let mut explicit_map = false;
@@ -69,6 +75,15 @@ impl Config {
                     explicit_map = true;
                 }
                 Some("--test-world") => { explicit_map = true; config.map = None; config.map_path = None; }
+                Some("--window") => {
+                    let mut rect = [0i32; 4];
+                    for value in &mut rect {
+                        *value = args.next().ok_or("--window requires X Y WIDTH HEIGHT")?.to_string_lossy().parse().map_err(|_| "Invalid --window value")?;
+                    }
+                    if rect[2] < 320 || rect[3] < 240 { return Err("--window size must be at least 320x240".into()); }
+                    config.window = Some(rect);
+                }
+                Some("--borderless") => config.borderless = true,
                 Some("--check-assets") => config.check_assets = true,
                 Some("--start-paused") => config.start_paused = true,
                 Some("--teleport") => config.teleport = Some(args.next().ok_or("--teleport requires a destination ID")?.to_string_lossy().into_owned()),

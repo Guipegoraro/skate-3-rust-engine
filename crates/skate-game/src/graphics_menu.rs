@@ -204,9 +204,12 @@ fn setup(
     if !supported_msaa.contains(&settings.samples) {
         settings.samples = 1;
     }
-    window
-        .resolution
-        .set_physical_resolution(settings.width, settings.height);
+    // A launcher-placed window (--window) keeps its rectangle instead of the saved size.
+    if config.window.is_none() {
+        window
+            .resolution
+            .set_physical_resolution(settings.width, settings.height);
+    }
     window.present_mode = PresentMode::AutoNoVsync;
     let size = settings.internal_size(window.physical_size());
     let mut image = Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
@@ -521,8 +524,11 @@ fn apply(
     mut images: ResMut<Assets<Image>>,
     mut cameras: Query<(Entity, &mut Msaa), With<Camera3d>>,
     mut previous: Local<Option<GraphicsSettings>>,
+    config: Res<crate::config::Config>,
 ) {
-    if previous
+    // A launcher-placed window (--window) keeps its size until the menu changes it.
+    let first_placed = previous.is_none() && config.window.is_some();
+    if !first_placed && previous
         .as_ref()
         .is_none_or(|p| p.width != menu.settings.width || p.height != menu.settings.height)
     {

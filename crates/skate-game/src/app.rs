@@ -51,7 +51,9 @@ pub(crate) fn build(
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: config.multiplayer.title.clone().unwrap_or_else(||"Skate 3 Rust Engine".into()),
-                    resolution: (1280, 800).into(),
+                    resolution: config.window.map_or((1280, 800).into(), |[_, _, w, h]| (w as u32, h as u32).into()),
+                    position: config.window.map_or(WindowPosition::Automatic, |[x, y, ..]| WindowPosition::At(IVec2::new(x, y))),
+                    decorations: !config.borderless,
                     ..default()
                 }),
                 ..default()
