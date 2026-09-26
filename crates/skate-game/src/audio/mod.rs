@@ -20,7 +20,7 @@ impl Plugin for AudioPlugin {
         app.add_message::<PlaySound>()
             .init_resource::<SoundLoops>()
             .add_systems(Startup, (load, smoke_test).chain())
-            .add_systems(Update, (session_marker, gameplay::state_sounds, play, reconcile_loops).chain());
+            .add_systems(Update, (session_marker, gameplay::state_sounds, gameplay::loop_sounds, play, reconcile_loops).chain());
     }
 }
 
