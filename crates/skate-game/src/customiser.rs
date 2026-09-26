@@ -813,7 +813,7 @@ fn interact(
             state.redraw = true;
             return;
         }
-        if keys.just_pressed(KeyCode::Escape) || nav.pressed & 0x2000 != 0 {
+        if crate::input::menu_back_pressed(&keys) || nav.pressed & 0x2000 != 0 {
             state.search.clear();
             state.selected = 0;
             state.redraw = true;
@@ -823,7 +823,7 @@ fn interact(
     let visible = state.visible();
     let count = visible.len();
     let mut action = None;
-    let mut back = keys.just_pressed(KeyCode::Escape)
+    let mut back = crate::input::menu_back_pressed(&keys)
         || keys.just_pressed(KeyCode::Backspace)
         || nav.pressed & 0x2000 != 0;
     let mut movement = 0;

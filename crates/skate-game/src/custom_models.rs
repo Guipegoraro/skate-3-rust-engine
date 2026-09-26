@@ -297,7 +297,7 @@ fn interact(
         state.just_opened = false;
         return;
     }
-    if keys.just_pressed(KeyCode::Escape) || nav.pressed & (0x2000 | 0x10) != 0 {
+    if crate::input::menu_back_pressed(&keys) || nav.pressed & (0x2000 | 0x10) != 0 {
         state.open = false;
         state.dirty = true;
         return;

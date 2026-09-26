@@ -119,7 +119,7 @@ fn input(
         return;
     }
     if let Some((key, mut value)) = menu.editing.take() {
-        if keys.just_pressed(KeyCode::Escape) || nav.pressed & 0x2000 != 0 {
+        if crate::input::menu_back_pressed(&keys) || nav.pressed & 0x2000 != 0 {
             typing.clear();
             return;
         }
@@ -152,7 +152,7 @@ fn input(
         return;
     }
     typing.clear();
-    if keys.just_pressed(KeyCode::Escape) || nav.pressed & (0x2000 | 0x10) != 0 {
+    if crate::input::menu_back_pressed(&keys) || nav.pressed & (0x2000 | 0x10) != 0 {
         if menu.id.take().is_none() {
             menu.open = false;
         }

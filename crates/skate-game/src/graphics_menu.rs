@@ -304,7 +304,7 @@ pub(crate) fn interact(
         return;
     }
     if mods.open || travel.open || travel.closed_this_frame || customiser.open || custom_models.open { return; }
-    if keys.just_pressed(KeyCode::Escape) || nav.pressed & 0x10 != 0 {
+    if crate::input::menu_back_pressed(&keys) || nav.pressed & 0x10 != 0 {
         menu.open = !menu.open;
     }
     let mut action = None;

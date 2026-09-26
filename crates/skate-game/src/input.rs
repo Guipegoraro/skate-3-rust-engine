@@ -11,6 +11,13 @@ pub(crate) mod platform;
 pub(crate) use controllers::{ControllerInput, ControllerStatus};
 use skate_core::input::tick::TickInput;
 
+/// Keys that act as Escape: toggle the pause menu and back out of every menu.
+pub(crate) const MENU_BACK_KEYS: [KeyCode; 2] = [KeyCode::Escape, KeyCode::F2];
+
+pub(crate) fn menu_back_pressed(keys: &ButtonInput<KeyCode>) -> bool {
+    keys.any_just_pressed(MENU_BACK_KEYS)
+}
+
 #[derive(Resource, Clone, Copy, Debug)]
 pub(crate) struct PublishedTickInput(pub TickInput);
 

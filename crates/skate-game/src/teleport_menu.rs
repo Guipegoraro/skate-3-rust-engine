@@ -133,7 +133,7 @@ fn interact(
         }
         let mut chosen = (keys.just_pressed(KeyCode::Enter) || nav.pressed & 0x1000 != 0).then_some(travel.selected);
         for (interaction,row) in &buttons { if *interaction == Interaction::Pressed { chosen=Some(row.0); } }
-        if keys.just_pressed(KeyCode::Escape) || nav.pressed & (0x2000|0x10) != 0 { chosen=Some(travel.rows.len()); }
+        if crate::input::menu_back_pressed(&keys) || nav.pressed & (0x2000|0x10) != 0 { chosen=Some(travel.rows.len()); }
         if let Some(i)=chosen {
             if let Some(m)=travel.rows.get(i).and_then(|d| d.matrix) {
                 match skater.travel_to(m) { Ok(())=>menu.open=false, Err(e)=>warn!("Travel: {e}") }
