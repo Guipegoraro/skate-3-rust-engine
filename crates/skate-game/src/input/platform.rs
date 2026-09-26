@@ -25,6 +25,9 @@ pub(crate) struct CapabilityCache {
     value: Option<(u8, std::time::Instant)>,
 }
 impl CapabilityCache {
+    pub(crate) const fn new() -> Self {
+        Self { value: None }
+    }
     pub(crate) fn invalidate(&mut self) {
         self.value = None;
     }
@@ -130,15 +133,41 @@ mod windows {
     }
 }
 
+/// XInputGetState on an empty slot costs ~0.1-0.2 ms, and gameplay plus menus poll all four
+/// slots every frame (SK-028: ~1.4 ms/frame with no pad). An empty slot is re-polled at most
+/// once per second, so a newly connected controller appears within a second.
+const DISCONNECTED_RETRY: std::time::Duration = std::time::Duration::from_secs(1);
+static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+static DISCONNECTED_UNTIL_US: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
+
+fn skip_disconnected(index: usize, now: std::time::Instant) -> bool {
+    let since = now.duration_since(*EPOCH.get_or_init(std::time::Instant::now)).as_micros() as u64;
+    since < DISCONNECTED_UNTIL_US[index].load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn mark_disconnected(index: usize, now: std::time::Instant) {
+    let until = (now + DISCONNECTED_RETRY).duration_since(*EPOCH.get_or_init(std::time::Instant::now));
+    DISCONNECTED_UNTIL_US[index].store(until.as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+}
+
 pub(crate) fn poll_cached(
     index: usize,
     cache: &mut CapabilityCache,
 ) -> Result<DevicePacket, DeviceError> {
     assert!(index < 4);
+    let now = std::time::Instant::now();
+    if skip_disconnected(index, now) {
+        cache.invalidate();
+        return Err(DeviceError::Disconnected);
+    }
     #[cfg(windows)]
-    return windows::poll(index as u32, cache);
+    let result = windows::poll(index as u32, cache);
     #[cfg(not(windows))]
-    Err(DeviceError::UnsupportedPlatform)
+    let result = Err(DeviceError::UnsupportedPlatform);
+    if matches!(result, Err(DeviceError::Disconnected)) {
+        mark_disconnected(index, now);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -170,7 +199,10 @@ mod cache_tests {
     }
 }
 
-// Preserve the uncached API for menu-only polling.
+/// Menu-only polling. Keeps its own per-slot capability cache so a connected pad is not
+/// re-queried for capabilities every frame.
 pub(crate) fn poll(index: usize) -> Result<DevicePacket, DeviceError> {
-    poll_cached(index, &mut CapabilityCache::default())
+    static MENU_CACHES: std::sync::Mutex<[CapabilityCache; 4]> = std::sync::Mutex::new([const { CapabilityCache::new() }; 4]);
+    let mut caches = MENU_CACHES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    poll_cached(index, &mut caches[index])
 }

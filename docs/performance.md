@@ -207,3 +207,12 @@ dominate. MSAA 8x costs about 10-20 FPS against 4x. The character-only shadow ma
 4 cascades to 100 m to 2 cascades to 40 m: main schedule about 0.6 ms lower, FPS within noise
 (4x100: 112.6/114.1; 2x40: 118.3/107.4 at 200% MSAA 4x), skater shadow unchanged. Follow-up
 CPU work is SK-028.
+
+### Controller polling (SK-028)
+
+A CPU trace (`--trace`, 8 s at spawn) showed `customiser::navigation` (~0.7 ms/frame) and
+`input::poll_controllers` (~0.65 ms/frame) near the top of the main schedule: both called
+XInput on all four slots every frame, and the menu path also re-read capabilities each call.
+Empty slots are now re-polled at most once per second and the menu keeps a capability cache.
+At 200% + MSAA 4x with no controller connected: main schedule 6.2-6.9 ms -> 3.2-3.5 ms,
+104-118 FPS -> 129-136 FPS (3 runs). A connected pad keeps its per-frame poll.

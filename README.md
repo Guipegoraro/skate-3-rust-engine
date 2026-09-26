@@ -90,6 +90,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - 16x anisotropic filtering on world textures.
 - Render scale up to 200% (supersampling), since MSAA stops at 8x.
 - Performance (SK-018): `scripts/Bench-Graphics.ps1` A/B benchmark with `SKATE_RENDER_SCALE`/`SKATE_MSAA`/`SKATE_FPS_LIMIT`/`SKATE_CHARACTER_SHADOW` overrides; the character shadow map uses 2 cascades to 40 m instead of 4 to 100 m. Results in [docs/performance.md](docs/performance.md).
+- Controller polling no longer queries empty XInput slots every frame (re-checked once per second): main schedule ~3 ms faster, about +20% FPS on University (SK-028).
 
 **Assets and tooling**
 - Setup has a new optional `audio` group (SK-020): it downloads vgmstream-cli (pinned SHA) and decodes 11 original sound banks (grinds, wheels, scrapes, footsteps...) to `assets/private/audio/` with an `audio.json` index. A failure only disables sound.
