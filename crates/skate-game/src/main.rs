@@ -27,6 +27,7 @@ mod updater;
 mod map_library;
 mod map_render;
 mod map_transition;
+mod crash_recovery;
 mod difficulty;
 mod graph_host;
 mod graph_runtime;

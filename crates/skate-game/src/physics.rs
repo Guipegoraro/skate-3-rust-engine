@@ -429,7 +429,7 @@ fn advance(
     input: Res<crate::input::PublishedTickInput>,
     mut camera: ResMut<crate::camera::CameraRuntime>,
     mut cadence: ResMut<Time<Fixed>>,
-    mut exit: MessageWriter<AppExit>,
+    (mut exit, mut recovery): (MessageWriter<AppExit>, Option<ResMut<crate::crash_recovery::CrashRecovery>>),
     mut performance: Option<ResMut<crate::performance::Performance>>,
 ) {
     // A driven vehicle or fly mode owns the player; native physics stays frozen.
@@ -449,7 +449,7 @@ fn advance(
         &mut camera,
     ) {
         physics.failed = true;
-        error!(
+        let report = format!(
             "{message}; state={:?}; tick={}; mapped_input={:?}; force_mode={}; board_axis_y={}; flags={:08x}/{:08x}/{:08x}/{:08x}/{:08x}",
             skater.player_state.current(),
             physics.ticks,
@@ -462,7 +462,12 @@ fn advance(
             skater.player_input.processed.flags_2480,
             skater.player_input.processed.flags_2484,
         );
-        exit.write(AppExit::error());
+        error!("{report}");
+        // SK-033: save the report and rebuild the world instead of closing the game.
+        match recovery.as_mut().filter(|_| !crate::crash_recovery::fail_fast()) {
+            Some(recovery) => recovery.physics_failed(report),
+            None => { exit.write(AppExit::error()); }
+        }
     }
     cadence.set_timestep(physics.clock.period());
     if let (Some(performance), Some(timer)) = (performance.as_mut(), timer) {

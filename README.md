@@ -101,6 +101,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - Scripted play test harness (`crates/skate-game/src/tests/scripted_play.rs`) that drives the physics from a raw controller script; notes in [docs/testing-notes.md](docs/testing-notes.md).
 
 **Fixes**
+- **Crash recovery** (SK-033): a physics failure no longer closes the game. The report is saved to `logs/crash-<time>.txt`, the current map is reloaded and the skater is put back where it was about 2 s earlier; the pause menu status shows the report path. `SKATE_FAIL_FAST=1` (and `--verify`) keep the old exit-with-error behaviour; `SKATE_FORCE_PHYSICS_FAILURE=<seconds>` fakes one failure for testing.
 - Board landing crash (SK-031): on x86, a subnormal squared length (vector lanes around 1e-20 after a landing) made `length()` infinite and the ground up vector NaN, which the physics rejected and closed the game. The Xbox 360 VMX unit flushes denormals to zero; `length()` and the ground-orientation normalize now do the same.
 - On-foot crash after landing (SK-025): a leftover 4th (w) component in the skater's position fed back through the moving-support velocity and doubled every tick until the physics failed. Faster running made it more likely. The support velocity now has no w component.
 
