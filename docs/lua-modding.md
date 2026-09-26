@@ -158,7 +158,7 @@ Cube positions and teleport positions must be finite, each component within ±10
 }
 ```
 
-Keyboard names follow Bevy 0.18 `KeyCode` debug names, e.g. `KeyA`, `KeyJ`, `F6`, `Space`, `ArrowUp`, `ShiftLeft`. Held-state reads do not consume input or inject native actions. Track the previous held state in a Lua local for edge detection. Native actions expose the current published mapping: 64/65 left stick axes, 66 left trigger, 67/68 right stick axes, 69 right trigger, 70/71 stick clicks, 72/73 shoulders, 74–77 face buttons, 78/79 Start/Back, 80/81 D-pad horizontal/vertical as provided by the existing expression map. These are observations, not a binding editor. Consult `crates/skate-core/src/input/gameplay_map.rs` for the retained source mapping; no new native input semantics are introduced.
+Keyboard names follow Bevy 0.18 `KeyCode` debug names, e.g. `KeyA`, `KeyJ`, `F6`, `Space`, `ArrowUp`, `ShiftLeft`. Held-state reads do not consume input or inject native actions. Track the previous held state in a Lua local for edge detection. Native actions expose the current published mapping: 64/65 left stick X/Y, 66 left stick click, 67/68 right stick X/Y, 69 right stick click, 70/71 left/right trigger, 72/73 LB/RB, 74–77 D-pad up/down/left/right, 78/79 X/Y, 80/81 A/B, as provided by the existing expression map (`GAMEPLAY` in `crates/skate-data/src/input_config.rs`). LB + D-pad up/down is the native session marker. These are observations, not a binding editor. Consult `crates/skate-core/src/input/gameplay_map.rs` for the retained source mapping; no new native input semantics are introduced.
 
 `on_event` receives one of:
 
