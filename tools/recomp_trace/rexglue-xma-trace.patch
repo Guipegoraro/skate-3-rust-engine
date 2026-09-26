@@ -1,0 +1,83 @@
+diff --git a/src/audio/xma_context.cpp b/src/audio/xma_context.cpp
+index 98734ba..18cba08 100644
+--- a/src/audio/xma_context.cpp
++++ b/src/audio/xma_context.cpp
+@@ -35,6 +35,34 @@ extern "C" {
+ #endif
+ }  // extern "C"
+ 
++// skate-3-rust-engine SK-032 audio trace: with REX_XMA_TRACE=<file>, append one line per new
++// XMA input buffer a context starts decoding: milliseconds since start, context id, buffer
++// size and its first 32 bytes (hex). Off (no cost beyond one check) when the variable is unset.
++#include <chrono>
++#include <cstdio>
++#include <cstdlib>
++#include <mutex>
++#include <unordered_map>
++namespace {
++void TraceXmaInput(uint32_t context, const uint8_t* buffer, uint32_t size) {
++  static const char* path = std::getenv("REX_XMA_TRACE");
++  if (!path || !buffer) return;
++  static std::mutex mutex;
++  static std::unordered_map<uint32_t, const uint8_t*> last;
++  static FILE* file = std::fopen(path, "a");
++  static const auto start = std::chrono::steady_clock::now();
++  std::lock_guard<std::mutex> lock(mutex);
++  if (!file || last[context] == buffer) return;
++  last[context] = buffer;
++  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
++                      std::chrono::steady_clock::now() - start).count();
++  std::fprintf(file, "%lld %u %u ", static_cast<long long>(ms), context, size);
++  for (uint32_t i = 0; i < 32 && i < size; ++i) std::fprintf(file, "%02x", buffer[i]);
++  std::fputc('\n', file);
++  std::fflush(file);
++}
++}  // namespace
++
+ // Credits for most of this code goes to:
+ // https://github.com/koolkdev/libertyv/blob/master/libav_wrapper/xma2dec.c
+ 
+@@ -109,6 +137,13 @@ bool XmaContext::Work() {
+   }
+ 
+   std::lock_guard<std::mutex> lock(lock_);
++  {
++    // SK-032 trace, before the decoder choice so it covers both decoders.
++    XMA_CONTEXT_DATA trace(memory()->TranslateVirtual(guest_ptr()));
++    if (trace.IsCurrentInputBufferValid()) {
++      TraceXmaInput(id(), GetCurrentInputBuffer(&trace), GetCurrentInputBufferSize(&trace));
++    }
++  }
+   if (REXCVAR_GET(xma_use_old_decoder)) {
+     return WorkOldFrameDecoder();
+   }
+@@ -653,6 +688,7 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+   }
+ 
+   uint8_t* current_input_buffer = GetCurrentInputBuffer(data);
++  TraceXmaInput(id(), current_input_buffer, GetCurrentInputBufferSize(data));
+ 
+   input_buffer_.fill(0);
+ 
+diff --git a/src/ui/imgui_drawer.cpp b/src/ui/imgui_drawer.cpp
+index 50a26d0..708feff 100644
+--- a/src/ui/imgui_drawer.cpp
++++ b/src/ui/imgui_drawer.cpp
+@@ -387,7 +387,7 @@ void ImGuiDrawer::SetupFonts() {
+     // DirectWrite white-on-black edge
+     // profiles (identity was measurably thinner/dimmer). The *_on_light_
+     // variants below keep gamma 1.0 - dark-on-light needs no correction.
+-    config.RasterizerGamma = 0.62f;
++    // SK-032 trace build: stock imgui has no RasterizerGamma.
+     config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_NoHinting;
+     ui_font_ = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+         GetInterRegularCompressedBase85(), 18.0f, &config);
+@@ -408,7 +408,7 @@ void ImGuiDrawer::SetupFonts() {
+     config_on_light.RasterizerMultiply = 1.0f;
+     // Dark-on-light matches the browser with NO coverage curve (harness fit:
+     // identity beat every contrast/gamma variant once bake==draw size).
+-    config_on_light.RasterizerGamma = 1.0f;
++    // SK-032 trace build: stock imgui has no RasterizerGamma.
+     ui_font_on_light_ = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+         GetInterRegularCompressedBase85(), 18.0f, &config_on_light);
+     ui_font_semibold_on_light_ = io.Fonts->AddFontFromMemoryCompressedBase85TTF(

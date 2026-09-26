@@ -55,3 +55,7 @@ Add to it whenever a test teaches something new.
 
 - The asset pipeline needs numpy/Pillow: `python -m venv .local/venv` then `.local/venv/Scripts/python -m pip install -r tools/requirements-setup.txt`. Run pipeline tests with that interpreter; with the global Python, `test_optional_content` fails on imports, which is not a real failure.
 - Converting a map validates it by launching the game with `--check-assets`; close the game first.
+
+## Original game as reference
+
+- `scripts/Run-Skate3RecompTrace.ps1` runs Skate3Recomp with an XMA-tracing runtime (tools/recomp_trace); `tools/audio_trace_match.py` turns the log into `<bank>/<index>` per played buffer. First run matched the menu sounds to `sk8_menu/53`/`54`. Music/ambience show as unknown (streamed, not in audiofiles.big).
