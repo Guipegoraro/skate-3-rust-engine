@@ -22,7 +22,7 @@ def main():
         seconds = (s['samples'] or 0) / (s['rate'] or 1)
         loop = f"{s['loop_start']}..{s['loop_end']}" if s.get('loop_end') else ''
         relative = Path(s['file']).relative_to('private/audio').as_posix()
-        rows.append(f"<tr data-bank='{html.escape(s['bank'])}'><td><code>{html.escape(s['id'])}</code></td>"
+        rows.append(f"<tr data-bank='{html.escape(s['bank'])}' data-len='{seconds:.3f}'><td><code>{html.escape(s['id'])}</code></td>"
                     f"<td>{seconds:.2f}s</td><td>{loop}</td>"
                     f"<td><audio controls preload='none' src='{html.escape(relative)}'></audio></td></tr>")
     banks = sorted({s['bank'] for s in sounds})
@@ -31,9 +31,15 @@ def main():
 <style>body{{font:14px system-ui;margin:16px}}td{{padding:2px 8px}}code{{user-select:all}}</style>
 <h1>Skate 3 sounds ({len(sounds)})</h1>
 <p>Click an id to select it, then paste it into events.json.
-<select id=bank onchange="for(const r of document.querySelectorAll('tr[data-bank]'))r.hidden=this.value&&r.dataset.bank!=this.value">
-<option value=''>All banks</option>{options}</select></p>
-<table>{''.join(rows)}</table>"""
+<select id=bank onchange=filter()><option value=''>All banks</option>{options}</select>
+<label><input type=checkbox id=short onchange=filter()> only short (&lt; 0.4 s: pops, landings, impacts)</label>
+<label><input type=checkbox id=sort onchange=order()> sort by length</label></p>
+<table id=list>{''.join(rows)}</table>
+<script>
+const rows=[...document.querySelectorAll('tr[data-bank]')];
+function filter(){{const b=bank.value,s=short.checked;for(const r of rows)r.hidden=(b&&r.dataset.bank!=b)||(s&&+r.dataset.len>=0.4)}}
+function order(){{const l=document.getElementById('list');const sorted=sort.checked?[...rows].sort((a,b)=>a.dataset.len-b.dataset.len):rows;for(const r of sorted)l.appendChild(r)}}
+</script>"""
     (audio/'index.html').write_text(page, encoding='utf-8')
     print(audio/'index.html')
 
