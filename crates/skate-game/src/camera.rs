@@ -54,7 +54,7 @@ pub(crate) struct VehicleCameraBlend { active:bool, previous:Option<Transform>, 
 
 pub(crate) fn present(vehicles: Res<crate::modding::vehicles::Vehicles>, mut runtime: ResMut<CameraRuntime>, windows: Query<&Window>,
     history: Res<crate::presentation::Presentation>, time: Res<Time<Fixed>>,
-    replay: Res<crate::replay::Replay>,
+    (replay, fly): (Res<crate::replay::Replay>, Res<crate::fly_mode::FlyMode>),
     virtual_time: Res<Time<Virtual>>, mut vehicle_blend: Local<VehicleCameraBlend>,
     customiser: Option<Res<crate::customiser::Customiser>>,
     mut cameras: Query<(&mut Camera, &mut Transform, &mut Projection), With<GameplayCamera>>) {
@@ -67,6 +67,7 @@ pub(crate) fn present(vehicles: Res<crate::modding::vehicles::Vehicles>, mut run
         if replay.active {
             if let Some(free) = replay.free_camera { *transform = free; }
         }
+        if let Some(free) = fly.camera() { *transform = free; }
         if let Projection::Perspective(p) = &mut *projection {
             p.fov = previous.fov + (current.fov - previous.fov) * alpha;
         }

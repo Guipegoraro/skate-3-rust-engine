@@ -409,7 +409,7 @@ impl Plugin for PhysicsPlugin {
 }
 
 fn advance(
-    vehicles: Res<crate::modding::vehicles::Vehicles>,
+    (vehicles, fly): (Res<crate::modding::vehicles::Vehicles>, Res<crate::fly_mode::FlyMode>),
     mut physics: ResMut<GamePhysics>,
     mut skater: ResMut<SkaterRuntime>,
     mut controls: ResMut<PlayerControls>,
@@ -420,7 +420,8 @@ fn advance(
     mut exit: MessageWriter<AppExit>,
     mut performance: Option<ResMut<crate::performance::Performance>>,
 ) {
-    if physics.failed || vehicles.occupied() {
+    // A driven vehicle or fly mode owns the player; native physics stays frozen.
+    if physics.failed || vehicles.occupied() || fly.active() {
         return;
     }
     let timer = performance.as_ref().map(|_| std::time::Instant::now());

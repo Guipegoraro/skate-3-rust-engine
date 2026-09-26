@@ -99,7 +99,7 @@ pub(crate) fn build(
     )
     .add_plugins(crate::fps_overlay::FpsOverlayPlugin)
     .add_plugins((crate::game_options::GameOptionsPlugin, crate::ui_textures::UiTexturesPlugin,
-        crate::stick_hud::StickHudPlugin))
+        crate::stick_hud::StickHudPlugin, crate::fly_mode::FlyModePlugin))
     .add_plugins((
         crate::retail_render::RetailRenderPlugin,
         input::InputPlugin,

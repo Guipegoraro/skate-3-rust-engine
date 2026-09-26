@@ -8,12 +8,14 @@ use std::path::{Path, PathBuf};
 #[serde(default)]
 pub(crate) struct GameOptions {
     pub stick_indicator: bool,
+    /// B (or F3) on foot toggles fly mode.
+    pub fly_mode: bool,
     #[serde(skip)]
     path: PathBuf,
 }
 impl Default for GameOptions {
     fn default() -> Self {
-        Self { stick_indicator: true, path: PathBuf::new() }
+        Self { stick_indicator: true, fly_mode: true, path: PathBuf::new() }
     }
 }
 
@@ -24,11 +26,18 @@ pub(crate) struct OptionRow {
     pub change: fn(&mut GameOptions, i32),
 }
 
-pub(crate) const ROWS: &[OptionRow] = &[OptionRow {
-    label: "Right-stick indicator",
-    value: |o| on_off(o.stick_indicator),
-    change: |o, _| o.stick_indicator = !o.stick_indicator,
-}];
+pub(crate) const ROWS: &[OptionRow] = &[
+    OptionRow {
+        label: "Right-stick indicator",
+        value: |o| on_off(o.stick_indicator),
+        change: |o, _| o.stick_indicator = !o.stick_indicator,
+    },
+    OptionRow {
+        label: "Fly mode (B on foot)",
+        value: |o| on_off(o.fly_mode),
+        change: |o, _| o.fly_mode = !o.fly_mode,
+    },
+];
 
 fn on_off(value: bool) -> String {
     if value { "On" } else { "Off" }.into()
