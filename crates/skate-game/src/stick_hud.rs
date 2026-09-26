@@ -77,8 +77,16 @@ impl Plugin for StickHudPlugin {
     }
 }
 
-fn spawn(mut commands: Commands) {
+// Original Trick Analyzer ring: the texture is the left half; the right half is its mirror.
+const RING_TEXTURE: &str = "hud2/trickanalyser/1";
+
+fn spawn(
+    mut commands: Commands,
+    mut ui: ResMut<crate::ui_textures::UiTextures>,
+    mut images: ResMut<Assets<Image>>,
+) {
     let centre = Vec2::splat(SIZE * 0.5);
+    let ring_texture = ui.get(RING_TEXTURE, &mut images);
     commands.spawn((
         Name::new("Right stick HUD"),
         StickRoot,
@@ -93,8 +101,27 @@ fn spawn(mut commands: Commands) {
         },
         GlobalZIndex(90),
     )).with_children(|parent| {
-        parent.spawn(centred(ring(SIZE, 2.0, Color::srgba(1.0, 1.0, 1.0, 0.55)), centre));
-        parent.spawn(centred(ring(SIZE * 0.3, 1.5, Color::srgba(1.0, 1.0, 1.0, 0.35)), centre));
+        match ring_texture {
+            Some(texture) => {
+                for (left, flip_x) in [(0.0, false), (SIZE * 0.5, true)] {
+                    parent.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: px(left),
+                            top: px(0),
+                            width: px(SIZE * 0.5),
+                            height: px(SIZE),
+                            ..default()
+                        },
+                        ImageNode { flip_x, ..ImageNode::new(texture.clone()) },
+                    ));
+                }
+            }
+            None => {
+                parent.spawn(centred(ring(SIZE, 2.0, Color::srgba(1.0, 1.0, 1.0, 0.55)), centre));
+                parent.spawn(centred(ring(SIZE * 0.3, 1.5, Color::srgba(1.0, 1.0, 1.0, 0.35)), centre));
+            }
+        }
         for index in 0..MAX_POINTS - 1 {
             parent.spawn((LinePiece(index), segment(LINE, Color::NONE)));
         }

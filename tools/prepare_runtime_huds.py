@@ -45,6 +45,12 @@ def prepare_in_workspace(game, assets, work):
             continue
         files.update(install(assets,None if is_marker else source,source if is_marker else None,replace=True))
         availability.unlink(missing_ok=True)
+    try:
+        from asset_pipeline.ui_textures import export as export_ui
+        export_ui(game, assets, work / 'ui')
+    except CONTENT_ERRORS as error:
+        # Optional: engine overlays fall back to drawn shapes without these textures.
+        print(f'Original UI textures unavailable: {error}', flush=True)
     print(f'Original runtime HUDs ready: {len(files)} verified files', flush=True)
     return files
 
