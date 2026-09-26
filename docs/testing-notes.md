@@ -30,6 +30,14 @@ Add to it whenever a test teaches something new.
 - **Blow-ups (NaN/inf)**: assert on the first lane that grows, not only on "finite", to find the
   feedback loop early (SK-025: the support velocity `w` lane).
 
+## Lua mods without the game
+
+- `crates/skate-mods/tests/runtime.rs` runs example mods headless: build a `Manager` on
+  `sdk/examples`, set `m.snapshot` (fake player/map/actions), `dispatch` callbacks and read
+  `m.commands` (overlay text, trainer, teleport...). SK-007 feeds a moving position and checks the
+  overlay says 36 km/h. `examples_load_and_run` must list every example id.
+- Package a mod for the game with `python tools/package_mod.py sdk/examples/<mod> mods/<mod>.zip`.
+
 ## Live game (BRP)
 
 - The game serves Bevy Remote Protocol on port 15703 (`.local/play.cmd`). Only `Reflect`

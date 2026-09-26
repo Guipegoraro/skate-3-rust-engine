@@ -1,0 +1,25 @@
+{
+  "id": "guipegoraro.speedometer",
+  "api": 1,
+  "name": "Speedometer",
+  "version": "1.0.0",
+  "author": "guipegoraro",
+  "description": "Shows your speed on screen, on the board and on foot, plus the top speed since the map loaded.",
+  "entry": "main.lua",
+  "start_collapsed": true,
+  "settings": {
+    "show": {
+      "type": "boolean",
+      "label": "Show speedometer",
+      "description": "Show the speed text on screen.",
+      "default": true
+    },
+    "units": {
+      "type": "choice",
+      "label": "Units",
+      "description": "Speed units.",
+      "default": "km/h",
+      "choices": ["km/h", "mph", "m/s"]
+    }
+  }
+}

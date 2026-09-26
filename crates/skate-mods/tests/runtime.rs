@@ -152,7 +152,7 @@ fn examples_load_and_run() {
     m.scan(true);
     assert!(m.diagnostics.is_empty(), "{:?}", m.diagnostics);
     let ids: Vec<_> = m.packages.keys().cloned().collect();
-    assert_eq!(ids, vec!["community.mario-kart", "community.native-trainer", "guipegoraro.dpad-tools"]);
+    assert_eq!(ids, vec!["community.mario-kart", "community.native-trainer", "guipegoraro.dpad-tools", "guipegoraro.speedometer"]);
     for id in ids {
         m.enable(&id, true).unwrap();
         for _ in 0..5 {
@@ -162,6 +162,25 @@ fn examples_load_and_run() {
         }
         assert!(m.packages[&id].running(), "{:?}", m.packages[&id].error);
     }
+}
+
+#[test]
+fn speedometer_reads_speed_from_position() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sdk/examples");
+    let f = Fixture::new("return {}");
+    let mut m = Manager::new(root, f.0.join("speedometer-settings"));
+    let at = |x: f64| json!({"player":{"position":[x,0,0],"velocity":[0,0,0],"state":100,"on_board":true},"keys":{},"map":{"name":"test","generation":0},"tick":1,"actions":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]});
+    m.snapshot = at(0.);
+    m.scan(true);
+    m.enable("guipegoraro.speedometer", true).unwrap();
+    // 10 m/s = 36 km/h; smoothing settles within a second of ticks.
+    for tick in 0..120 {
+        m.snapshot = at(tick as f64 / 6.);
+        m.dispatch("on_fixed_update", json!({"dt":1. / 60.}));
+    }
+    m.dispatch("on_update", json!({"dt":0.2}));
+    let text = m.commands.iter().rev().find_map(|(_, c)| match c { Command::Overlay { text, .. } => Some(text.clone()), _ => None }).unwrap();
+    assert!(text.starts_with("36 km/h"), "{text}");
 }
 
 #[test]
