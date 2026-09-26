@@ -27,6 +27,11 @@ editor authoring scripts are excluded from release packages. XboxDev
 extract-xiso retains its own license files. Game assets are never downloaded
 from this project.
 
+Setup also downloads vgmstream-cli (release r2117, pinned SHA-256, from
+https://github.com/vgmstream/vgmstream) to decode the user's own sound banks.
+vgmstream is distributed under its ISC-style license, and its bundled FFmpeg and
+codec libraries under their own licenses; all are retained in the downloaded archive.
+
 The setup executable bundles Python, NumPy, Pillow, Tcl/Tk and PyInstaller's
 bootloader. Their license information is retained by the packager alongside
 its bundled libraries. No game content is included in the release archive.

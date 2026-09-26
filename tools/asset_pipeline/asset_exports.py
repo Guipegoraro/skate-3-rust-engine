@@ -59,6 +59,21 @@ def character(game_root, stage, work, report, log, converted=None):
     (private/'game.json').write_text(json.dumps(game_manifest),encoding='utf-8')
 
 
+def audio(game_root, stage, work, report, log, tool):
+    """Optional: a failure (including the vgmstream download) is recorded in
+    audio-availability.json and setup continues without sound. `tool` returns the decoder."""
+    private=stage/"assets/private"
+    report('Decoding original sound banks')
+    from .audio_export import export
+    from .optional_content import CONTENT_ERRORS, note
+    availability=private/'audio-availability.json'
+    try:
+        export(game_root,private,work/'audio',tool(),report)
+        availability.unlink(missing_ok=True)
+    except CONTENT_ERRORS+(OSError,) as error:
+        note(availability,'Audio',error,report=report)
+
+
 def environment(game_root, stage, work, report, log, converted=None):
     private=stage/"assets/private"
     stock=private/"stock"

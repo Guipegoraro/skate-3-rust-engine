@@ -90,6 +90,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - Performance (SK-018): `scripts/Bench-Graphics.ps1` A/B benchmark with `SKATE_RENDER_SCALE`/`SKATE_MSAA`/`SKATE_FPS_LIMIT`/`SKATE_CHARACTER_SHADOW` overrides; the character shadow map uses 2 cascades to 40 m instead of 4 to 100 m. Results in [docs/performance.md](docs/performance.md).
 
 **Assets and tooling**
+- Setup has a new optional `audio` group (SK-020): it downloads vgmstream-cli (pinned SHA) and decodes 11 original sound banks (grinds, wheels, scrapes, footsteps...) to `assets/private/audio/` with an `audio.json` index. A failure only disables sound.
 - Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.
 - Bevy Remote Protocol behind the `brp` feature, for live inspection.
 - Scripted play test harness (`crates/skate-game/src/tests/scripted_play.rs`) that drives the physics from a raw controller script; notes in [docs/testing-notes.md](docs/testing-notes.md).

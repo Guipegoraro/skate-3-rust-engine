@@ -21,6 +21,9 @@ def map_workers():
     return count
 XISO_URL='https://github.com/XboxDev/extract-xiso/releases/download/build-202505152050/extract-xiso-Win64_Release.zip'
 XISO_SHA='fec88d03c7efd6205ab09be4abba70c0afd0eb27a5709f0a6235b828ba5ac11e'
+# Sound bank decoder for the optional audio group (SK-020).
+VGMSTREAM_URL='https://github.com/vgmstream/vgmstream/releases/download/r2117/vgmstream-win64.zip'
+VGMSTREAM_SHA='6c4a8a3813864fefed081bbd337dbc0ad93bf88e0b92f5db98d7ab258b22dc6c'
 
 def digest(path):
     with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
@@ -273,6 +276,9 @@ def _install(iso,base,game_exe,report,game_root=None,refresh=False,finalize=None
             exports.hud(game_root,stage,work,report,log)
         if 'character' in groups:
             exports.character(game_root,stage,work,report,log,converted)
+        if 'audio' in groups:
+            exports.audio(game_root,stage,work,report,log,
+                          lambda:dependency(base/'tools','vgmstream-cli',VGMSTREAM_URL,VGMSTREAM_SHA,report))
         if 'environment' in groups:
             exports.environment(game_root,stage,work,report,log,converted)
         if 'maps' in groups:
