@@ -85,7 +85,8 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.
 - Bevy Remote Protocol behind the `brp` feature, for live inspection.
 
-**Known issue:** on-foot run speed well above 1x can make the physics go non-finite on a sprint jump and close the game (SK-025, being fixed). Keep running speed at 1x until then.
+**Fixes**
+- On-foot crash after landing (SK-025): a leftover 4th (w) component in the skater's position fed back through the moving-support velocity and doubled every tick until the physics failed. Faster running made it more likely. The support velocity now has no w component.
 
 ## Advanced diagnostics
 

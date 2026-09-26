@@ -27,7 +27,10 @@ pub(super) fn update(s: &mut GroundMotionState, i: &GroundMotionInput) -> Frame 
             i.contact_frame_32,
         );
         let moved = transform_point(s.frame_0[3], delta);
-        let velocity = scale(sub(moved, s.frame_0[3]), reciprocal(DT));
+        let mut velocity = scale(sub(moved, s.frame_0[3]), reciprocal(DT));
+        // A residual w in frame_0[3] after landing fed back through w here and
+        // doubled every tick until it overflowed (SK-025). Velocity has no w.
+        velocity[3] = 0.0;
         let acceleration = madd(
             sub(velocity, s.support_velocity_256),
             reciprocal(DT),
