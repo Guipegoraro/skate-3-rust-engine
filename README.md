@@ -69,7 +69,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - New launch flags `--window X Y WIDTH HEIGHT` and `--borderless`.
 - In multiplayer, menus read only the window's own controller (`--controller`), or only the focused window without it.
 
-- **Sound framework** (SK-021): `crates/skate-game/src/audio/` plays the decoded original sounds. `events.json` maps event names to sounds (one line per sound); one-shots via `PlaySound`, loops via `SoundLoops::set` each frame. Master/Music/Effects volumes in Game options. `SKATE_AUDIO_TEST=<event>` plays an event at startup. `python tools/audio_browser.py assets` writes a local page (in your data folder) to listen to every decoded sound by id.
+- **Sound framework** (SK-021): `crates/skate-game/src/audio/` plays the decoded original sounds. `events.json` maps event names to sounds (one line per sound); one-shots via `PlaySound`, loops via `SoundLoops::set` each frame. Master/Music/Effects volumes in Game options. `SKATE_AUDIO_TEST=<event>` plays an event at startup. Gameplay sounds (SK-022): pop, landing, grind start and bail are triggered from physical state changes; their sound picks in `events.json` are provisional. `python tools/audio_browser.py assets` writes a local page (in your data folder) to listen to every decoded sound by id.
 
 **HUD**
 - **Right-stick indicator** at the bottom centre. It uses the original Trick Analyzer ring and draws a line along each flick that fades after the trick. When the original recognizer accepts a right-stick trick, the pattern's ideal path is drawn in amber with the trick name above the ring (SK-027).

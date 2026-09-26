@@ -1,4 +1,8 @@
 {
-  "_comment": "Sound events (SK-021). Each event picks one of its sounds (ids from assets/private/audio/audio.json, '<bank>/<index>') at random. volume 0..2, *_jitter are +- fractions, channel is effects or music. Adding a sound = one entry here.",
-  "grind_test": { "sounds": ["GRINDS/1", "GRINDS/2", "GRINDS/3"], "volume": 0.8, "pitch_jitter": 0.05 }
+  "_comment": "Sound events (SK-021/022). Each event picks one of its sounds (ids from assets/private/audio/audio.json, '<bank>/<index>') at random. volume 0..2, *_jitter are +- fractions, channel is effects or music. Adding a sound = one entry here. The gameplay picks below are PROVISIONAL: choose by ear with `python tools/audio_browser.py assets` and replace the ids.",
+  "grind_test": { "sounds": ["GRINDS/1", "GRINDS/2", "GRINDS/3"], "volume": 0.8, "pitch_jitter": 0.05 },
+  "pop": { "sounds": ["Skate_Collisions/1", "Skate_Collisions/2", "Skate_Collisions/3", "Skate_Collisions/4"], "volume": 0.9, "pitch_jitter": 0.04 },
+  "land": { "sounds": ["Skate_Collisions/5", "Skate_Collisions/6", "Skate_Collisions/7", "Skate_Collisions/8"], "volume": 1.0, "pitch_jitter": 0.04 },
+  "grind_start": { "sounds": ["GRINDS/1", "GRINDS/2", "GRINDS/3"], "volume": 0.8, "pitch_jitter": 0.05 },
+  "bail": { "sounds": ["Bodyslide/1", "Bodyslide/2", "Bodyslide/3"], "volume": 1.0, "pitch_jitter": 0.05 }
 }
