@@ -28,6 +28,30 @@ fn circle(diameter: f32) -> Node {
     }
 }
 
+/// Straight line of fixed thickness; place it with `span`.
+pub(crate) fn segment(thickness: f32, color: Color) -> (Node, BackgroundColor, UiTransform) {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            width: px(0),
+            height: px(thickness),
+            border_radius: BorderRadius::MAX,
+            ..default()
+        },
+        BackgroundColor(color),
+        UiTransform::IDENTITY,
+    )
+}
+
+/// Stretches and rotates a `segment` so it runs from `from` to `to`, in parent pixels.
+pub(crate) fn span(node: &mut Node, transform: &mut UiTransform, from: Vec2, to: Vec2) {
+    let delta = to - from;
+    node.width = px(delta.length());
+    centre_on(node, (from + to) * 0.5);
+    // UI Y points down, so atan2 in screen space is already the clockwise rotation.
+    transform.rotation = Rot2::radians(delta.y.atan2(delta.x));
+}
+
 /// Moves an absolute shape so its centre sits at `centre`, in pixels from the parent's top-left.
 pub(crate) fn centre_on(node: &mut Node, centre: Vec2) {
     let size = Vec2::new(px_value(node.width), px_value(node.height));

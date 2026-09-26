@@ -98,7 +98,11 @@ pub(crate) struct Menu {
     multiplayer: bool,
     browser: bool,
     daylight: bool,
+    options: bool,
 }
+// Main page rows; the last one opens the Game options page.
+const MAIN_ROWS: usize = 18;
+const OPTIONS_ROW: usize = 17;
 impl Menu {
     pub(crate) fn ambient_brightness(&self, automatic: f32) -> f32 {
         self.settings.ambient_level.map_or(automatic, |level| level as f32 * 10.)
@@ -240,7 +244,7 @@ fn setup(
             BackgroundColor(Color::srgb(0.035,0.055,0.08)))).with_children(|panel| {
             panel.spawn((Text::new("GAME MENU"),TextFont {font_size:32.,..default()},TextColor(Color::WHITE)));
             panel.spawn((Text::new("GAMEPLAY & GRAPHICS"),TextFont {font_size:16.,..default()},TextColor(Color::srgb(0.4,0.85,0.85))));
-            for i in 0..17 {
+            for i in 0..MAIN_ROWS {
                 panel.spawn((Button, MenuRow(i), Node {width:percent(100),min_height:px(26),padding:UiRect::all(px(3)),align_items:AlignItems::Center,border_radius:BorderRadius::all(px(5)),..default()},
                     BackgroundColor(Color::srgb(0.08,0.11,0.15)))).with_children(|row| {
                     row.spawn((MenuLabel(i),Text::new(""),TextFont {font_size:18.,..default()},TextColor(Color::WHITE)));
@@ -267,6 +271,7 @@ fn setup(
         multiplayer: false,
         browser: false,
         daylight: false,
+        options: false,
     });
 }
 fn msaa(samples: u32) -> Msaa {
@@ -297,7 +302,7 @@ pub(crate) fn interact(
     mut net: ResMut<crate::multiplayer::Multiplayer>,
     mut typing: MessageReader<bevy::input::keyboard::KeyboardInput>,
     mut updater: ResMut<crate::updater::Updater>,
-    mut travel: ResMut<crate::teleport_menu::Travel>,
+    (mut travel, mut options): (ResMut<crate::teleport_menu::Travel>, ResMut<crate::game_options::GameOptions>),
 ) {
     if transition.busy() {
         menu.open = true;
@@ -330,7 +335,8 @@ pub(crate) fn interact(
         }
     }
     if menu.open {
-        let rows = if menu.daylight { 4 } else if menu.multiplayer { 11 } else { 17 };
+        let rows = if menu.daylight { 4 } else if menu.options { crate::game_options::ROWS.len() + 1 }
+            else if menu.multiplayer { 11 } else { MAIN_ROWS };
         if !panel.focused {
         if keys.just_pressed(KeyCode::ArrowUp) || nav.pressed & 1 != 0 {
             menu.selected = (menu.selected + rows - 1) % rows;
@@ -355,7 +361,19 @@ pub(crate) fn interact(
     }
     if let Some((row, direction)) = action {
         let day_action = menu.daylight;
-        if menu.daylight {
+        let options_action = menu.options;
+        if menu.options {
+            match crate::game_options::ROWS.get(row) {
+                Some(option) => {
+                    (option.change)(&mut options, direction);
+                    menu.status = match options.save() {
+                        Ok(()) => "Saved".into(),
+                        Err(e) => format!("Could not save: {e}"),
+                    };
+                }
+                None => { menu.options = false; menu.selected = OPTIONS_ROW; }
+            }
+        } else if menu.daylight {
             match row {
                 0 => menu.settings.hour = ((menu.settings.hour * 4.).round() + direction as f32).rem_euclid(96.) / 4.,
                 1 => menu.settings.day_speed = cycle(DAY_SPEEDS, menu.settings.day_speed, direction),
@@ -469,10 +487,12 @@ pub(crate) fn interact(
                 14 => travel.open = true,
                 15 => mods.begin(),
                 16 => { menu.daylight = true; menu.selected = 0; menu.status = "Custom maps: change time, cycle speed and ambient light. Retail lighting stays authored.".into(); },
+                OPTIONS_ROW => { menu.options = true; menu.selected = 0; menu.status.clear(); },
                 _ => {}
             }
         }
-        if (row < 5 && !menu.multiplayer && !menu.daylight && !day_action) || (day_action && row < 3) {
+        if !options_action
+            && ((row < 5 && !menu.multiplayer && !menu.daylight && !day_action) || (day_action && row < 3)) {
             let save = (|| -> Result<(), String> {
                 std::fs::create_dir_all(menu.path.parent().unwrap()).map_err(|e| e.to_string())?;
                 std::fs::write(
@@ -549,6 +569,7 @@ fn apply(
 }
 fn labels(
     menu: Res<Menu>,
+    options: Res<crate::game_options::GameOptions>,
     transition: Res<crate::map_transition::MapTransition>,
     time: Res<Time<Real>>,
     customiser: Res<crate::customiser::Customiser>,
@@ -573,7 +594,12 @@ fn labels(
     let s = &menu.settings;
     let size = s.internal_size(window.physical_size());
     for (label, mut text) in &mut labels {
-        **text = if menu.daylight {
+        **text = if menu.options {
+            match crate::game_options::ROWS.get(label.0) {
+                Some(option) => format!("{:<22}{}", option.label, (option.value)(&options)),
+                None => "Back".into(),
+            }
+        } else if menu.daylight {
             match label.0 {
                 0 => { let minutes = (s.hour * 60.).floor() as u32 % 1440; format!("Time of day          {:02}:{:02}", minutes / 60, minutes % 60) },
                 1 => if s.day_speed == 0 { "Cycle speed          Frozen".into() } else { format!("Cycle speed          {}x ({} min/day)", s.day_speed, 1440 / s.day_speed) },
@@ -670,6 +696,7 @@ fn labels(
                 15 => "Mods".into(),
                 14 => "Teleport…".into(),
                 16 => "Day & night…".into(),
+                OPTIONS_ROW => "Game options…".into(),
                 _ => "Multiplayer".into(),
             }
         };
@@ -692,7 +719,8 @@ fn labels(
         menu.status.clone()
     };
     for (row, interaction, mut color, mut node) in &mut buttons {
-        node.display = if (menu.daylight && row.0 >= 4) || (menu.multiplayer && row.0 >= 11) { Display::None } else { Display::Flex };
+        node.display = if (menu.daylight && row.0 >= 4) || (menu.multiplayer && row.0 >= 11)
+            || (menu.options && row.0 > crate::game_options::ROWS.len()) { Display::None } else { Display::Flex };
         color.0 = if row.0 == menu.selected || *interaction == Interaction::Hovered {
             Color::srgb(0.10, 0.30, 0.34)
         } else {
@@ -731,7 +759,7 @@ mod tests {
             .insert_resource(Menu {
                 open: false, selected: 0, settings: GraphicsSettings::default(),
                 difficulty: Difficulty::Easy, path: PathBuf::new(), supported_msaa: vec![1, 2, 4, 8], status: String::new(),
-                multiplayer: false, browser: false, daylight: false,
+                multiplayer: false, browser: false, daylight: false, options: false,
                 maps: vec![crate::map_library::Entry { label: "Test world".into(), path: None }], selected_map: 0,
             })
             .add_systems(Update, apply);

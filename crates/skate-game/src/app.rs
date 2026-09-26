@@ -98,7 +98,7 @@ pub(crate) fn build(
             .chain(),
     )
     .add_plugins(crate::fps_overlay::FpsOverlayPlugin)
-    .add_plugins(crate::stick_hud::StickHudPlugin)
+    .add_plugins((crate::game_options::GameOptionsPlugin, crate::stick_hud::StickHudPlugin))
     .add_plugins((
         crate::retail_render::RetailRenderPlugin,
         input::InputPlugin,
