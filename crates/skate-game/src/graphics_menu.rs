@@ -28,7 +28,8 @@ const RESOLUTIONS: &[(u32, u32)] = &[
     (2560, 1600),
     (3840, 2160),
 ];
-const SCALES: &[u32] = &[25, 50, 67, 75, 85, 100];
+// Above 100% the scene renders larger and is filtered down to the window (supersampling).
+const SCALES: &[u32] = &[25, 50, 67, 75, 85, 100, 125, 150, 200];
 const DAY_SPEEDS: &[u32] = &[0, 1, 10, 30, 60, 120, 360, 720];
 const LIMITS: &[u32] = &[0, 30, 60, 90, 120, 144, 165, 240];
 
@@ -632,8 +633,8 @@ fn labels(
             match label.0 {
                 0 => format!("Resolution          {} x {}", s.width, s.height),
                 1 => format!(
-                    "Internal resolution   {}%  ({} x {})",
-                    s.scale, size.x, size.y
+                    "Internal resolution   {}%  ({} x {}){}",
+                    s.scale, size.x, size.y, if s.scale > 100 { "  SSAA" } else { "" }
                 ),
                 2 => format!(
                     "MSAA                {}",
@@ -796,6 +797,8 @@ mod tests {
             UVec2::new(960, 540)
         );
         assert_eq!(s.internal_size(UVec2::ZERO), UVec2::ONE);
+        let supersampled = GraphicsSettings { scale: 200, ..default() };
+        assert_eq!(supersampled.validated().internal_size(UVec2::new(1280, 800)), UVec2::new(2560, 1600));
         assert_eq!(cycle(LIMITS, 0, -1), 240);
         assert_eq!(cycle(LIMITS, 240, 1), 0);
     }

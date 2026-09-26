@@ -20,6 +20,9 @@ use skate_core::{
 use skate_data::skate_map::SkateMap;
 use std::collections::HashMap;
 
+/// Anisotropic filtering for mipped world surface textures; 16 is the hardware maximum.
+const WORLD_ANISOTROPY: u16 = 16;
+
 #[cfg(test)]
 #[path = "retail_shadow_geometry.rs"]
 pub(crate) mod shadow_geometry;
@@ -630,6 +633,11 @@ pub(crate) fn spawn(
                     if role != 1 && role != 4 && role != 6 && !cube {
                         sampler.address_mode_u = bevy::image::ImageAddressMode::Repeat;
                         sampler.address_mode_v = bevy::image::ImageAddressMode::Repeat;
+                    }
+                    // Mipped surface textures stay sharp at grazing angles (ground seen while riding).
+                    // Lightmaps (roles 1/4) keep the retail bilinear mip-zero sampling.
+                    if role == 3 || role == 6 {
+                        sampler.set_anisotropic_filter(WORLD_ANISOTROPY);
                     }
                     image.sampler = ImageSampler::Descriptor(sampler);
                     images.add(image)
