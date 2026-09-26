@@ -41,6 +41,7 @@ mod animation_phase;
 mod biped_ground;
 mod frame;
 mod gravity;
+pub(crate) mod impulse;
 mod grind;
 mod grind_air_settings;
 mod grind_camera;
@@ -121,6 +122,8 @@ pub(crate) struct GamePhysics {
     pub gravity: f32,
     /// Stock WorldGravity, scaled by `gravity` every tick.
     base_gravity: skate_core::math::Vector3,
+    /// Mod velocity change waiting for the next tick (SK-005).
+    pub pending_impulse: Option<[f32; 3]>,
 }
 
 /// Cross-phase records for the current fixed tick. Subsystems retain their
@@ -353,6 +356,7 @@ impl GamePhysics {
             trainer: Default::default(),
             gravity: 1.0,
             base_gravity,
+            pending_impulse: None,
         })
     }
 

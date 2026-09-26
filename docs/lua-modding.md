@@ -241,6 +241,11 @@ owner, separate from the trainer, and resets on disable/reload/fault. It scales 
 and the ground speed model's slope gravity. A few fixed -9.8 constants in board air, biped,
 handplant and grind-air paths still use stock gravity. Half gravity roughly doubles an on-foot jump.
 
+`sdk.player.impulse({x,y,z})` adds an instant velocity change (m/s, world axes, length <= 20;
+the per-tick total is capped at 20) to the board bodies and the skeleton before the next solve.
+It applies while riding (ground, powerslide, revert) and in board physics air. Other states own
+their velocity (KnownAir, plants, grinds, on foot, climbing), so the request is dropped there.
+
 `sdk/examples/native-trainer` demonstrates tuning, HUD text, checkpoints, timers,
 breadcrumbs, beacons and configurable shortcuts. Defaults: F5 save checkpoint, F6 return,
 F7 stopwatch, F8 clear transient data, F9 beacon. Its text data stays in the package.

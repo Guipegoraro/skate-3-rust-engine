@@ -112,6 +112,9 @@ sdk.trainer = {}
 ---@param tuning TrainerTuning Owned, reversible native tuning. Conflicting owner is rejected.
 function sdk.trainer.apply(tuning) end
 
+---@param velocity number[] {x,y,z} m/s world axes, length <= 20. Adds to the board and body velocity next tick. Riding (ground, powerslide, revert) and board physics air only; dropped in other states.
+function sdk.player.impulse(velocity) end
+
 sdk.physics = {}
 ---@param scale number World gravity multiplier 0.25..2; 1 restores stock. One owner at a time; reset on disable/fault.
 function sdk.physics.gravity(scale) end

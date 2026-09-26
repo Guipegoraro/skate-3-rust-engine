@@ -299,6 +299,8 @@ fn trainer_commands_validate_and_follow_settings() {
     assert!(Command::Gravity { scale: 0.5 }.validate());
     assert!(!Command::Gravity { scale: 0. }.validate());
     assert!(!Command::Gravity { scale: f32::NAN }.validate());
+    assert!(Command::Impulse { velocity: [0., 5., 10.] }.validate());
+    assert!(!Command::Impulse { velocity: [0., 0., 25.] }.validate());
     m.enable("example", false).unwrap();
     assert!(m.retired.contains(&"example".into()));
 }

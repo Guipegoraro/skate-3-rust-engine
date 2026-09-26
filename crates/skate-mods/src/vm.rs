@@ -26,6 +26,10 @@ pub enum Command {
     Gravity {
         scale: f32,
     },
+    /// Instant velocity change in m/s, world axes (SK-005).
+    Impulse {
+        velocity: [f32; 3],
+    },
     Log {
         text: String,
     },
@@ -62,6 +66,9 @@ impl Command {
             Self::VehicleControl{key,controls} => crate::schema::valid_id(key) && controls.valid(),
             Self::VehicleRemove{key}|Self::VehicleEnter{key}|Self::VehicleExit{key} => crate::schema::valid_id(key),
             Self::Trainer { tuning } => tuning.valid(),
+            Self::Impulse { velocity } => {
+                velocity.iter().all(|v| v.is_finite()) && velocity.iter().map(|v| v * v).sum::<f32>() <= 400.
+            }
             Self::Gravity { scale } => scale.is_finite() && (0.25..=2.).contains(scale),
             Self::Animation { path } => !path.is_empty() && path.len() <= 256,
             Self::Log { text } => text.len() <= 2048,

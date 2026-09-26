@@ -13,6 +13,8 @@ function sdk.player.read() return sdk.snapshot.player end
 function sdk.player.teleport(position,heading,on_board)
     submit{kind="teleport",position=position,heading=heading,on_board=on_board}
 end
+-- Instant velocity change {x,y,z} in m/s (length <= 20); riding and board air only.
+function sdk.player.impulse(velocity) submit{kind="impulse",velocity=velocity} end
 sdk.input = {}
 function sdk.input.down(key) return sdk.snapshot.keys[key] == true end
 -- Timers use active Update time. Reusing a key replaces the old timer.

@@ -379,6 +379,9 @@ fn apply_one(world: &mut World, mods: &mut Mods, id: &str, command: Command) -> 
             mods.trainer.claim(id, tuning)?;
             sync_native(world, mods);
         }
+        Command::Impulse { velocity } => {
+            crate::physics::impulse::queue(&mut world.resource_mut::<crate::physics::GamePhysics>(), velocity);
+        }
         Command::Gravity { scale } => {
             mods.gravity.claim(id, native_control::Gravity(scale))?;
             sync_native(world, mods);
