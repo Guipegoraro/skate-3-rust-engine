@@ -2,10 +2,11 @@
   "id": "guipegoraro.dpad-tools",
   "api": 1,
   "name": "D-pad Tools",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "guipegoraro",
   "description": "Controller shortcuts. D-pad left saves a spot, right returns to it. D-pad up/down raises or lowers push speed (ignored while LB is held, which keeps the native session marker). Disable Native Trainer: only one mod can own trainer tuning.",
   "entry": "main.lua",
+  "start_collapsed": true,
   "settings": {
     "push_step": {
       "type": "number",

@@ -132,6 +132,7 @@ fn sync(
         panel.layouts.entry(id.clone()).or_insert_with(|| Layout {
             size: Vec2::new(360., 760.),
             position: Vec2::new(16. + index as f32 * 22., 64. + index as f32 * 34.),
+            collapsed: mods.manager.packages[id].manifest.start_collapsed,
             ..default()
         });
         let name = &mods.manager.packages[id].manifest.name;

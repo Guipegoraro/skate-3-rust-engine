@@ -13,6 +13,9 @@ pub struct Manifest {
     pub entry: String,
     #[serde(default)]
     pub settings: BTreeMap<String, Setting>,
+    /// The settings window opens collapsed the first time it appears in a session.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub start_collapsed: bool,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
