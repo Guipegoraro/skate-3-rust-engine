@@ -35,5 +35,15 @@ foreach ($key in 'SKATE_FPS_LIMIT', 'SKATE_RENDER_SCALE', 'SKATE_MSAA', 'SKATE_P
     Remove-Item "Env:$key" -ErrorAction SilentlyContinue
 }
 $rows | Format-Table -AutoSize | Out-String -Width 200
+if ($Repeats -gt 1) {
+    # Mean and standard deviation of FPS per scale/MSAA pair.
+    $rows | Group-Object { $_.Scenario -replace '-run\d+$', '' } | ForEach-Object {
+        $fps = @($_.Group | ForEach-Object FPS)
+        $mean = ($fps | Measure-Object -Average).Average
+        $sd = [math]::Sqrt((($fps | ForEach-Object { ($_ - $mean) * ($_ - $mean) }) | Measure-Object -Sum).Sum / [math]::Max(1, $fps.Count - 1))
+        [pscustomobject]@{ Scenario = $_.Name; MeanFPS = [math]::Round($mean, 1); SdFPS = [math]::Round($sd, 1)
+            MainMs = [math]::Round(($_.Group | Measure-Object Main -Average).Average, 2) }
+    } | Format-Table -AutoSize | Out-String -Width 200
+}
 $rows | Export-Csv -NoTypeInformation (Join-Path $out 'summary.csv')
 Write-Host "Reports: $out"

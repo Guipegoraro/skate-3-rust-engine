@@ -104,6 +104,10 @@ pub(crate) struct Menu {
 const MAIN_ROWS: usize = 18;
 const OPTIONS_ROW: usize = 17;
 impl Menu {
+    /// Effective graphics settings, for SKATE_PERF_REPORT (SK-028).
+    pub(crate) fn settings_json(&self) -> serde_json::Value {
+        serde_json::to_value(&self.settings).unwrap_or_default()
+    }
     pub(crate) fn ambient_brightness(&self, automatic: f32) -> f32 {
         self.settings.ambient_level.map_or(automatic, |level| level as f32 * 10.)
     }

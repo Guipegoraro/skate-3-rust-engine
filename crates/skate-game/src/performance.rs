@@ -54,6 +54,8 @@ pub(crate) struct Performance {
     samples: Vec<[f64; 4]>,
     sample_times: Vec<f64>,
     render: Arc<Mutex<Vec<[f64; 7]>>>,
+    /// GPU adapter name, for comparing reports across machines (SK-028).
+    adapter: String,
 }
 impl Performance {
     pub(crate) fn physics(&mut self, elapsed: std::time::Duration) {
@@ -142,6 +144,7 @@ impl Plugin for PerformancePlugin {
             samples: Vec::with_capacity(16384),
             sample_times: Vec::with_capacity(16384),
             render,
+            adapter: String::new(),
         })
         .add_systems(First, begin)
         .add_systems(Last, finish);
@@ -159,7 +162,9 @@ fn mesh_binding_end(mut timer: ResMut<MeshBindingTimer>) {
 fn report_adapter(
     device: Res<bevy::render::renderer::RenderDevice>,
     adapter: Res<bevy::render::renderer::RenderAdapterInfo>,
+    mut performance: ResMut<Performance>,
 ) {
+    performance.adapter = format!("{} ({:?})", adapter.name, adapter.backend);
     eprintln!(
         "SKATE_GPU adapter={:?} features={:?} limits={:?}",
         &**adapter,
@@ -180,7 +185,7 @@ fn begin(mut p: ResMut<Performance>) {
     p.physics_ms = 0.;
     p.ticks = 0;
 }
-fn finish(mut p: ResMut<Performance>, mut exit: MessageWriter<AppExit>) {
+fn finish(mut p: ResMut<Performance>, mut exit: MessageWriter<AppExit>, menu: Option<Res<crate::graphics_menu::Menu>>) {
     let now = Instant::now();
     let elapsed = now
         .duration_since(*p.start.get_or_insert(now))
@@ -228,6 +233,9 @@ fn finish(mut p: ResMut<Performance>, mut exit: MessageWriter<AppExit>) {
             "frame_ms_max": frames[frames.len()-1],
             "frame_ms_p99": frames[(frames.len()-1)*99/100],
             "frames_over_8ms": frames.iter().filter(|&&ms| ms > 8.).count(),
+            "adapter": p.adapter,
+            "graphics": menu.map(|m| m.settings_json()),
+            "camera_sweep": std::env::var_os("SKATE_PERF_CAMERA_SWEEP").is_some(),
         });
         match std::fs::write(&p.path, serde_json::to_vec_pretty(&report).unwrap()) {
             Ok(()) => {

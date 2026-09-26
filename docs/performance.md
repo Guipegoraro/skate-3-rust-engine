@@ -216,3 +216,22 @@ XInput on all four slots every frame, and the menu path also re-read capabilitie
 Empty slots are now re-polled at most once per second and the menu keeps a capability cache.
 At 200% + MSAA 4x with no controller connected: main schedule 6.2-6.9 ms -> 3.2-3.5 ms,
 104-118 FPS -> 129-136 FPS (3 runs). A connected pad keeps its per-frame poll.
+
+### Recommended settings (SK-028)
+
+`scripts/Bench-Graphics.ps1 -Scales 100,200 -Msaa 2,4,8 -Repeats 3 -Sweep` after the polling fix
+(University, camera sweep, RX 9060 XT, 1280 x 800). Reports now include `adapter`, the effective
+`graphics` settings and `camera_sweep`.
+
+| Scenario | Mean FPS | SD | Main ms |
+|---|---|---|---|
+| 100% MSAA 2x | 145.7 | 22.5 | 3.63 |
+| 100% MSAA 4x | 163.0 | 10.8 | 3.06 |
+| 100% MSAA 8x | 174.1 | 2.1 | 3.11 |
+| 200% MSAA 2x | 165.1 | 13.9 | 3.26 |
+| 200% MSAA 4x | 149.3 | 32.2 | 3.03 |
+| 200% MSAA 8x | 126.7 | 1.2 | 3.02 |
+
+Runs are noisy (SD up to 30 FPS), but 200% + MSAA 8x is consistently the slowest (render
+prepare ~3.3 ms instead of ~1.5 ms). Recommendation: one player 200% + MSAA 2x or 4x
+(supersampling already smooths edges); two players side by side 100% + MSAA 4x.
