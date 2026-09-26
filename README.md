@@ -55,6 +55,38 @@ Implementation notes are in [`docs/`](docs/). Patched Bevy dependencies and
 their licenses are in [`vendor/`](vendor/). This is an unofficial project,
 not affiliated with EA.
 
+## Changes in this fork
+
+Modifications on top of upstream (branch `dev/brp`). The feature board lives in
+[`tasks/`](tasks/) (`ordna`); each entry names its card.
+
+**Controls and menus**
+- **F2 acts as Escape**: it opens the pause menu and backs out of menus.
+- **Game options** page in the pause menu (Right-stick indicator, Fly mode), saved to `settings/game-options.json`.
+- **Fly / noclip mode** (SK-026): press **B** (or F3) while on foot. Use the left stick to move, LB/RB to go down/up, and B again to land. Physics is paused while flying.
+
+**HUD**
+- **Right-stick indicator** at the bottom centre. It uses the original Trick Analyzer ring and draws a line along each flick that fades after the trick.
+
+**Mods and SDK**
+- **D-pad Tools** example mod (`sdk/examples/dpad-tools`):
+  - D-pad left saves a spot; D-pad right returns to it.
+  - D-pad up/down changes push speed on the board and running speed on foot.
+  - Its window starts collapsed and its HUD starts hidden.
+- `sdk.trainer.apply` has a new `run_speed` field (0.25..4) that scales on-foot walk, run and sprint speed (SK-025).
+- Mod manifests can set `start_collapsed` so the mod's settings window opens minimized.
+- Fixed the native action IDs listed in [docs/lua-modding.md](docs/lua-modding.md).
+
+**Graphics**
+- 16x anisotropic filtering on world textures.
+- Render scale up to 200% (supersampling), since MSAA stops at 8x.
+
+**Assets and tooling**
+- Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.
+- Bevy Remote Protocol behind the `brp` feature, for live inspection.
+
+**Known issue:** on-foot run speed well above 1x can make the physics go non-finite on a sprint jump and close the game (SK-025, being fixed). Keep running speed at 1x until then.
+
 ## Advanced diagnostics
 
 Windows builds support opt-in [performance timeline capture](docs/performance-tracing.md)
