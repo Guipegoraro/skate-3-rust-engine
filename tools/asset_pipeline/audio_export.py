@@ -17,6 +17,11 @@ BANKS = ('GRINDS', 'board_scrapes', 'Brd_Squeaks', 'WHEEL_SKID_BANK', 'Bodyslide
          'fstep_skateshoe1_sm', 'FOOT_DRAG')
 
 
+# audiofiles.big SPLC banks (.bnk, see splc.py): board collisions/pops/landings, metal hits,
+# clothing foley, menu sounds and whooshes.
+SPLC_BANKS = ('Skate_Collisions', 'Skate_Metal', 'sk8_foley', 'sk8_menu', 'Sk82_Whsh_Bys')
+
+
 def _vgmstream(tool, *args):
     kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if hasattr(subprocess, 'CREATE_NO_WINDOW') else {}
     done = subprocess.run([str(tool), *map(str, args)], capture_output=True, text=True, **kwargs)
@@ -35,15 +40,48 @@ def _info(tool, source):
     return infos
 
 
+def _record(bank, index, info):
+    loop = info.get('loopingInfo') or {}
+    return {
+        'id': f'{bank}/{index}', 'file': f'private/audio/{bank}/{index}.wav',
+        'bank': bank, 'index': index,
+        'rate': info.get('sampleRate'), 'channels': info.get('channels'),
+        'samples': info.get('numberOfSamples'),
+        'loop_start': loop.get('start') if loop else None,
+        'loop_end': loop.get('end') if loop else None,
+    }
+
+
+def _export_splc(bank, data, audio, work, tool):
+    """Each SPLC sample is a standalone EA SNR; decode them one by one (index from 1)."""
+    from .splc import split
+    target = audio/bank
+    target.mkdir(exist_ok=True)
+    sounds = []
+    for index, (_, snr) in enumerate(split(data), start=1):
+        source = work/f'{bank}-{index}.snr'
+        source.write_bytes(snr)
+        _vgmstream(tool, '-i', '-o', target/f'{index}.wav', source)
+        info = json.loads(_vgmstream(tool, '-m', '-I', source).strip().splitlines()[-1])
+        sounds.append(_record(bank, index, info))
+        source.unlink()
+    return sounds
+
+
 def export(game_root, private, work, tool, report=print):
     audio = private/'audio'
     audio.mkdir(parents=True, exist_ok=True)
     work.mkdir(parents=True, exist_ok=True)
     wanted = {name.lower() for name in BANKS}
+    wanted_splc = {name.lower() for name in SPLC_BANKS}
     archive = BigArchive(Path(game_root)/'data/audio/audiofiles.big')
     sounds = []
     for entry in archive.entries:
         path = Path(entry.path)
+        if path.suffix.lower() == '.bnk' and path.stem.lower() in wanted_splc:
+            report(f'Decoding sound bank {path.stem}')
+            sounds.extend(_export_splc(path.stem, archive.read(entry), audio, work, tool))
+            continue
         if path.suffix.lower() != '.abk' or path.stem.lower() not in wanted:
             continue
         bank = path.stem
@@ -57,17 +95,9 @@ def export(game_root, private, work, tool, report=print):
             file = target/f'{index}.wav'
             if not file.is_file():
                 continue
-            loop = info.get('loopingInfo') or {}
-            sounds.append({
-                'id': f'{bank}/{index}', 'file': f'private/audio/{bank}/{index}.wav',
-                'bank': bank, 'index': index,
-                'rate': info.get('sampleRate'), 'channels': info.get('channels'),
-                'samples': info.get('numberOfSamples'),
-                'loop_start': loop.get('start') if loop else None,
-                'loop_end': loop.get('end') if loop else None,
-            })
+            sounds.append(_record(bank, index, info))
         source.unlink()
-    missing = wanted - {s['bank'].lower() for s in sounds}
+    missing = (wanted | wanted_splc) - {s['bank'].lower() for s in sounds}
     (audio/'audio.json').write_text(json.dumps({'version': 1, 'sounds': sounds,
                                                 'missing_banks': sorted(missing)}), encoding='utf-8')
     return sounds
