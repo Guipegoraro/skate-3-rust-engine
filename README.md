@@ -95,6 +95,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 **Assets and tooling**
 - Setup has a new optional `audio` group (SK-020): it downloads vgmstream-cli (pinned SHA) and decodes 11 original sound banks (grinds, wheels, scrapes, footsteps...) to `assets/private/audio/` with an `audio.json` index. A failure only disables sound.
 - Setup also exports the original front-end UI textures (`hud2/…`) for HUD use.
+- **DLC maps** (SK-009): `scripts/Convert-DlcMaps.ps1` converts your own official DLC districts (Maloof Money Cup DLC, Zen, AG Park, Sanitarium, Back Lot, Downtown Skatepark Night, DW Mega Compound) from the packages Skate3Recomp extracted; they appear in the map menu. `convert_map`/`map_job.py` take `--district`/`--label` for multi-district packages.
 - Bevy Remote Protocol behind the `brp` feature, for live inspection.
 - Scripted play test harness (`crates/skate-game/src/tests/scripted_play.rs`) that drives the physics from a raw controller script; notes in [docs/testing-notes.md](docs/testing-notes.md).
 

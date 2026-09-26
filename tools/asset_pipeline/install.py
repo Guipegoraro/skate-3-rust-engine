@@ -98,7 +98,10 @@ def extract(archive,destination,entries=None):
     data.extract_entries(data.entries if entries is None else [e for e in data.entries if entries(e)],destination)
     return data
 
-def convert_map(archive,work,maps,stage,game_exe,log,report):
+def convert_map(archive,work,maps,stage,game_exe,log,report,district=None,label=None):
+    """Disc maps derive the district from worldDIST_<name>.big. DLC packages (SK-009) hold
+    one or more districts under another name, so `district` picks one stream and `label`
+    names the .skate; `archive` may also be an X360 stream folder (DIST_* from the importer)."""
     timings={};started=time.perf_counter()
     def finished(phase):
         nonlocal started
@@ -110,12 +113,18 @@ def convert_map(archive,work,maps,stage,game_exe,log,report):
     from prepare_university import EXCLUDED_NORMAL_TEXTURE_IDS
     from build_retail_collision_archive import build_archive
     from .map_writer import write as write_map, SpawnSelector
-    district=archive.stem.removeprefix('world')
-    label=district.removeprefix('DIST_')
+    if archive.is_dir():
+        district=district or archive.name
+    district=district or archive.stem.removeprefix('world')
+    label=label or district.removeprefix('DIST_').removeprefix('Dist_')
     district_work=work/district
-    extract(archive,district_work/'raw')
+    if archive.is_dir():
+        stream=archive
+    else:
+        prefix=f'data/content/world/stream/{district}/'.lower()
+        extract(archive,district_work/'raw',(lambda e:e.path.lower().startswith(prefix)) if label else None)
+        stream=district_work/'raw/data/content/world/stream'/district
     finished('extract')
-    stream=district_work/'raw/data/content/world/stream'/district
     if not stream.is_dir():raise RuntimeError('Missing district stream '+str(stream))
     spawn=SpawnSelector(district)
     manifest_path=prepare(stream_directory=stream,output_root=district_work/'intermediate',
