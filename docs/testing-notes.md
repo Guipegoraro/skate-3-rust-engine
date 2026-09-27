@@ -79,6 +79,8 @@ Stop-TestGame $g                     # closes the game, restores mod and model s
   `Stop-TestGame` in a `finally`.
 - `Start-TestGame` also stops `skate-steam-relay`, which can outlive the game and hold `bin/steam-relay` files so staging fails. The module runs on Windows PowerShell 5 too (no `utf8NoBOM` there; `Write-Utf8` writes BOM-less UTF-8).
 - `scripts/Test-SkaterSize.ps1`: screenshots per mod setting; the pattern for any visual option (one Start/Stop per value).
+- `Start-TestGame` backs up `graphics.json` and `game-options.json` too: a test that changes options through the menu once left the player's settings with SSAO/bloom on.
+- When the monitors are asleep (user away), the game cannot create its window surface and crashes at startup: live tests are impossible then; do headless work (scripted harness, unit tests) instead.
 - Screenshot size is a cheap sanity check: a 1x1 PNG means the game rendered into an empty window.
 - Only `Reflect` types are visible through BRP; `GamePhysics` is not, so physics checks belong
   in the scripted harness.

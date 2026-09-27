@@ -106,6 +106,10 @@ function Start-TestGame {
         }
         while (-not (Test-PortFree $Port)) { $Port++ }   # another Bevy app (iw4L) may own it
         $game = [pscustomobject]@{ Process = $null; Port = $Port; Log = $null; ErrorLog = $null; Backups = @{} }
+        # Tests can change settings through the menus; always put the player's back afterwards.
+        foreach ($name in 'graphics.json', 'game-options.json') {
+            Backup-File $game (Join-Path (Get-Installation) "settings\$name")
+        }
         $settings = Join-Path (Get-Installation) 'settings\mods'
         foreach ($id in $Mods.Keys) {
             $file = Join-Path $settings "$id.json"
