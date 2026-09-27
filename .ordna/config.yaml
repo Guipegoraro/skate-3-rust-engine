@@ -2,7 +2,7 @@
 storage: file
 tasksDir: tasks
 schema: ordna
-statuses: [idea, new, voce, doing, testing, finished]
+statuses: [idea, far-away, new, voce, doing, testing, finished]
 idPrefix: SK
 zeroPaddedIds: 3
 webPort: 7420
