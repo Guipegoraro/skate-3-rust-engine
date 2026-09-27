@@ -53,6 +53,13 @@ Add to it whenever a test teaches something new.
 - BRP port clash: if `brp_extras/screenshot` says the method is not found, another Bevy app (e.g. iw4L) owns the port; check the owner with `Get-NetTCPConnection -State Listen` and relaunch with another `BRP_EXTRAS_PORT` (15705).
 - Mod features: enable a mod for a test by writing `data/installations/<id>/settings/mods/<mod id>.json` (`{"enabled":true,"values":{...}}`) before launch; set it back afterwards.
 - The first BRP connection right after launch can fail while the port is not yet listening; wait for `netstat` to show it LISTENING.
+- Finding entities by name (SK-034): BRP `world.query` with `bevy_ecs::name::Name` and
+  `Transform`, filtered on the name in PowerShell; `scripts/Test-Pedestrians.ps1` reads NPC
+  roots twice 3 s apart to check they walk.
+- Animation checks from screenshots: take 3-4 shots ~0.3 s apart and crop/upscale the character
+  with .NET `System.Drawing` (the global Python has no Pillow); legs must change pose.
+- FPS A/B: `SKATE_PERF_REPORT=<file.json>` makes the game record 10-25 s after start, write the
+  report and exit. Test world: ~88 FPS, 11.4 ms median on this machine (SK-034, 0 vs 10 NPCs).
 
 ## Python pipeline
 

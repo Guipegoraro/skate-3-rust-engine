@@ -258,7 +258,7 @@ fn bind(
     mut materials: ResMut<Assets<CharacterMaterial>>,
     entities: Query<(Entity, &GltfMaterialName, &MeshMaterial3d<StandardMaterial>, Option<&RenderLayers>)>,
     parents: Query<&ChildOf>,
-    players: Query<(), Or<(With<crate::world::PlayerRoot>, With<crate::multiplayer::appearance::RemoteCharacter>)>>,
+    players: Query<(), Or<(With<crate::world::PlayerRoot>, With<crate::puppet::Puppet>)>>,
     parts: Query<(), With<crate::customiser_parts::PartRoot>>,
     native: Query<&crate::custom_models::NativeModelRoot>,
     imports: Query<(), With<crate::custom_models::CustomModelRoot>>,

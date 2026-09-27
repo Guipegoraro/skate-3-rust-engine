@@ -4,7 +4,6 @@
 //! manual teleport path the vehicle exit uses. Disabled while multiplayer is active.
 use crate::camera::GameplayCamera;
 use bevy::prelude::*;
-use skate_core::{math::Vector3, physics::triangle_query::{TriangleLineHit, triangle_segment}};
 
 const B: u16 = 0x2000;
 const LB: u16 = 0x0100;
@@ -161,23 +160,7 @@ fn land(fly: &mut FlyMode, physics: &crate::physics::GamePhysics, skater: &mut c
 
 /// Closest upward-facing world surface straight below `position`.
 fn ground_below(world: &skate_core::physics::board_world::BoardWorld, position: Vec3) -> Option<Vec3> {
-    let start = Vector3::new(position.x, position.y, position.z);
-    let delta = Vector3::new(0.0, -GROUND_SEARCH, 0.0);
-    let end = Vector3::new(position.x, position.y - GROUND_SEARCH, position.z);
-    let mut best: Option<(f32, Vector3)> = None;
-    for (_, entry) in world.line_candidates(start, end, 0.0) {
-        if entry.triangle.feature.normal.y < 0.3 {
-            continue;
-        }
-        let mut hit = TriangleLineHit { position: Vector3::ZERO, normal: Vector3::ZERO,
-            fraction: 0.0, volume_parameter: [0.0; 3] };
-        if triangle_segment(&mut hit, start, delta, entry.triangle.vertices, 0.0, 0.0)
-            && best.is_none_or(|(fraction, _)| hit.fraction < fraction)
-        {
-            best = Some((hit.fraction, hit.position));
-        }
-    }
-    best.map(|(_, p)| Vec3::new(p.x, p.y, p.z))
+    crate::world_probe::ground_below(world, position, GROUND_SEARCH, 0.3)
 }
 
 #[derive(Component)]

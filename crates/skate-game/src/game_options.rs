@@ -14,6 +14,8 @@ pub(crate) struct GameOptions {
     pub master_volume: u32,
     pub music_volume: u32,
     pub effects_volume: u32,
+    /// NPC pedestrians wandering around the player, 0 = off (SK-034).
+    pub pedestrians: u32,
     #[serde(skip)]
     path: PathBuf,
 }
@@ -25,6 +27,7 @@ impl Default for GameOptions {
             master_volume: 80,
             music_volume: 70,
             effects_volume: 100,
+            pedestrians: 4,
             path: PathBuf::new(),
         }
     }
@@ -63,7 +66,14 @@ pub(crate) const ROWS: &[OptionRow] = &[
         value: |o| percent(o.effects_volume),
         change: |o, step| o.effects_volume = volume_step(o.effects_volume, step),
     },
+    OptionRow {
+        label: "Pedestrians (NPCs)",
+        value: |o| if o.pedestrians == 0 { "Off".into() } else { o.pedestrians.to_string() },
+        change: |o, step| o.pedestrians = count_step(o.pedestrians, step, MAX_PEDESTRIANS),
+    },
 ];
+
+pub(crate) const MAX_PEDESTRIANS: u32 = 12;
 
 fn on_off(value: bool) -> String {
     if value { "On" } else { "Off" }.into()
@@ -79,6 +89,14 @@ fn volume_step(value: u32, step: i32) -> u32 {
         return 0;
     }
     (value as i32 + step.signum() * 10).clamp(0, 100) as u32
+}
+
+/// Left/Right step by 1. Right/Enter past `max` wraps to 0.
+fn count_step(value: u32, step: i32, max: u32) -> u32 {
+    if step > 0 && value >= max {
+        return 0;
+    }
+    (value as i32 + step.signum()).clamp(0, max as i32) as u32
 }
 
 impl GameOptions {
@@ -120,5 +138,11 @@ mod tests {
         assert!(options.stick_indicator);
         (ROWS[0].change)(&mut options, 1);
         assert_eq!((ROWS[0].value)(&options), "Off");
+    }
+    #[test]
+    fn pedestrian_count_steps_and_wraps() {
+        assert_eq!(count_step(4, 1, MAX_PEDESTRIANS), 5);
+        assert_eq!(count_step(0, -1, MAX_PEDESTRIANS), 0);
+        assert_eq!(count_step(MAX_PEDESTRIANS, 1, MAX_PEDESTRIANS), 0);
     }
 }

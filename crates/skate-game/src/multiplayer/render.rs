@@ -1,37 +1,18 @@
 use super::appearance::{Appearances, Look, RemoteCharacter};
 use super::*;
-use crate::customiser_material::SkaterMaterial;
-use bevy::{
-    mesh::{morph::MorphWeights, skinning::SkinnedMesh},
-    scene::SceneInstance,
-};
-struct Candidate {
-    root: Entity,
-    scenes: Vec<Entity>,
-    look: Look,
-    started: Instant,
-}
-#[derive(Component)]
-struct OutfitPiece {
-    id: String,
-    mid: String,
-}
-
+use crate::puppet::{Binding, LoadState, PuppetLoad, PuppetLoader, PuppetRig, pose_locals};
 use skate_net::interpolation::{Buffer, Clock, position};
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub(super) struct RemoteSkins {
     reported: f64,
     actors: BTreeMap<u64, RemoteSkin>,
-    rest: Vec<Mat4>,
-    parents: Vec<i32>,
-    board: Option<usize>,
 }
 #[derive(Default)]
 struct RemoteSkin {
     root: Option<Entity>,
-    bindings: Vec<(Entity, usize, Option<usize>)>,
+    bindings: Vec<Binding>,
     visible: Option<Entity>,
-    pending: Option<Candidate>,
+    pending: Option<PuppetLoad>,
     requested: Option<[u8; 32]>,
 
     positions: Buffer<[f32; 3]>,
@@ -43,58 +24,7 @@ struct RemoteSkin {
 pub(super) struct RemoteRenderPlugin;
 impl Plugin for RemoteRenderPlugin {
     fn build(&self, app: &mut App) {
-        let idle = app
-            .world()
-            .resource::<crate::assets::AssetManifest>()
-            .0
-            .initial_animation
-            .clone();
-        let skater = app.world().resource::<SkaterRuntime>();
-        let pose = skater
-            .animation
-            .evaluator
-            .evaluate(&[
-                skate_core::animation::playback_tree::PoseCommand::Clip {
-                    name: idle,
-                    previous_time: 0.,
-                    time: 0.,
-                    loops: 0,
-                },
-                skate_core::animation::playback_tree::PoseCommand::Pose {
-                    name: "RIG_TPOSE".into(),
-                },
-                skate_core::animation::playback_tree::PoseCommand::Add { motion_is_a: true },
-            ])
-            .unwrap_or_else(|_| skater.animation.pose.clone());
-        let rest = pose
-            .iter()
-            .copied()
-            .map(skate_core::animation::output::sqt_to_matrix)
-            .map(crate::animation::native_matrix)
-            .collect();
-        let parents = skater
-            .animation
-            .evaluator
-            .frames
-            .parents
-            .iter()
-            .map(|&p| p as i32)
-            .collect();
-        let board = skater
-            .animation
-            .evaluator
-            .frames
-            .bone_names
-            .iter()
-            .position(|n| n == "SKATEBOARD_ROOT");
-        app.insert_resource(RemoteSkins {
-            board,
-            reported: 0.,
-            actors: BTreeMap::new(),
-            rest,
-            parents,
-        })
-        .add_systems(
+        app.init_resource::<RemoteSkins>().add_systems(
             Update,
             (spawn, bind, present)
                 .chain()
@@ -102,14 +32,14 @@ impl Plugin for RemoteRenderPlugin {
         );
     }
 }
+fn bone_globals(bones: &[skate_net::Bone], rig: &PuppetRig) -> Vec<Mat4> {
+    rig.globals(bones.iter().map(|b| (b.index as usize, network::matrix(b.pose))))
+}
 pub(super) fn spawn(
-    mut commands: Commands,
+    mut loader: PuppetLoader,
     net: Res<Multiplayer>,
     looks: Res<Appearances>,
     mut skins: ResMut<RemoteSkins>,
-    server: Res<AssetServer>,
-    parts: Res<crate::customiser_parts::Parts>,
-    models: Res<crate::custom_models::CustomModels>,
 ) {
     let removed: Vec<_> = skins
         .actors
@@ -119,7 +49,7 @@ pub(super) fn spawn(
         .collect();
     for id in removed {
         if let Some(root) = skins.actors.remove(&id).and_then(|s| s.root) {
-            commands.entity(root).despawn();
+            loader.commands().entity(root).despawn();
         }
     }
     for &id in net.remotes.keys() {
@@ -128,9 +58,11 @@ pub(super) fn spawn(
             ..default()
         });
         let root = *skin.root.get_or_insert_with(|| {
-            commands
+            loader
+                .commands()
                 .spawn((
                     RemoteCharacter,
+                    crate::puppet::Puppet,
                     Transform::default(),
                     Visibility::Inherited,
                     Name::new("Remote skater"),
@@ -156,223 +88,41 @@ pub(super) fn spawn(
         }
         skin.requested = Some(key);
         if let Some(old) = skin.pending.take() {
-            commands.entity(old.root).despawn();
+            loader.commands().entity(old.root).despawn();
         }
-        let mut scenes = vec![];
-        let mut specs = vec![];
-        let look = match look {
-            Look::Outfit(profile) => match parts.resolve(&profile) {
-                Ok(p) => Look::Outfit(p),
-                Err(e) => {
-                    warn!("Remote outfit: {e}");
-                    Look::Stock
-                }
-            },
-            other => other,
-        };
-        match &look {
-            Look::Stock => specs.push(("private/skater.glb".to_owned(), None)),
-            Look::Native(key) => {
-                if let Some(path) = models.online_native_path(key) {
-                    specs.push((path, None));
-                } else {
-                    specs.push(("private/skater.glb".to_owned(), None));
-                }
-            }
-            Look::Imported(path) => specs.push((path.clone(), None)),
-            Look::Outfit(profile) => {
-                for v in profile["selections"]
-                    .as_object()
-                    .into_iter()
-                    .flat_map(|s| s.values())
-                {
-                    let Some((id, mid)) = v["asset_id"].as_str().zip(v["material_id"].as_str())
-                    else {
-                        continue;
-                    };
-                    if let Some(part) = parts.library.models.get(id) {
-                        specs.push((part.scene.clone(), Some((id.to_owned(), mid.to_owned()))));
-                    }
-                }
-            }
-        }
-        if specs.is_empty() || specs.len() > 32 {
-            continue;
-        }
-        let candidate = commands
-            .spawn((Transform::default(), Visibility::Hidden, ChildOf(root)))
-            .id();
-        if let Look::Native(key) = &look {
-            commands
-                .entity(candidate)
-                .insert(crate::custom_models::NativeModelRoot(key.clone()));
-        }
-        if matches!(look, Look::Imported(_)) {
-            commands
-                .entity(candidate)
-                .insert(crate::custom_models::CustomModelRoot);
-        }
-        for (path, piece) in specs {
-            let mut e = commands.spawn((
-                SceneRoot(server.load(GltfAssetLabel::Scene(0).from_asset(path))),
-                ChildOf(candidate),
-            ));
-            if let Some((id, mid)) = piece {
-                e.insert((
-                    crate::customiser_parts::PartRoot(id.clone()),
-                    OutfitPiece { id, mid },
-                ));
-            }
-            scenes.push(e.id());
-        }
-        skin.pending = Some(Candidate {
-            root: candidate,
-            scenes,
-            look,
-            started: Instant::now(),
-        });
+        skin.pending = loader.spawn(root, look);
     }
 }
 
 fn bind(
-    mut commands: Commands,
+    mut loader: PuppetLoader,
     net: Res<Multiplayer>,
+    rig: Res<PuppetRig>,
     mut skins: ResMut<RemoteSkins>,
-    skater: Res<SkaterRuntime>,
-    meshes: Query<(Entity, &SkinnedMesh)>,
-    nodes: Query<(&Name, &Transform)>,
-    parents: Query<&ChildOf>,
-    instances: Query<&SceneInstance>,
-    spawner: Res<SceneSpawner>,
-    server: Res<AssetServer>,
-    mut parts: ResMut<crate::customiser_parts::Parts>,
-    mut materials: ResMut<Assets<SkaterMaterial>>,
-    pieces: Query<&OutfitPiece>,
-    mut morphs: Query<(Entity, &mut MorphWeights)>,
 ) {
-    let initial_poses: BTreeMap<_, _> = skins
-        .actors
-        .iter()
-        .filter(|(_,skin)|skin.pending.is_some())
-        .map(|(&id,_)| {
-            let bones = net
-                .remotes
-                .get(&id)
-                .and_then(|r| r.poses.back())
-                .map(|p| p.bones.as_slice())
-                .unwrap_or(&[]);
-            (id, globals(bones, &skins))
-        })
-        .collect();
     for (id, skin) in skins.actors.iter_mut() {
         let Some(p) = skin.pending.as_ref() else {
             continue;
         };
-        if p.started.elapsed() > Duration::from_secs(120) {
-            warn!("Remote appearance loading timed out; previous skater retained");
-            commands.entity(p.root).despawn();
-            skin.pending = None;
-            continue;
-        }
-        if p.scenes.iter().any(|&e| {
-            !instances
-                .get(e)
-                .is_ok_and(|i| spawner.instance_is_ready(**i))
-        }) {
-            continue;
-        }
-        if let Look::Outfit(profile) = &p.look {
-            for e in &p.scenes {
-                if let Ok(piece) = pieces.get(*e) {
-                    parts.warm(&piece.mid, &server, &mut materials);
-                }
-            }
-            if !parts.tattoos_ready(profile, &server)
-                || p.scenes.iter().any(|&e| {
-                    pieces
-                        .get(e)
-                        .is_ok_and(|piece| !parts.material_ready(&piece.mid, &server))
-                })
-            {
-                continue;
-            }
-        }
-        let bindings = match crate::animation::AnimationStatus::for_scene(
-            p.root,
-            &skater.animation.evaluator.frames.bone_names,
-            &meshes,
-            &nodes,
-            &parents,
-        ) {
-            Ok(b) => b.online_bindings(),
-            Err(e) => {
-                warn!("Remote appearance rejected: {e}");
-                commands.entity(p.root).despawn();
+        let bindings = match loader.poll(p, false) {
+            LoadState::Waiting => continue,
+            LoadState::Failed(e) => {
+                warn!("Remote appearance rejected ({e}); previous skater retained");
                 skin.pending = None;
                 continue;
             }
+            LoadState::Ready(bindings) => bindings,
         };
-        if let Look::Outfit(profile) = &p.look {
-            for &scene in &p.scenes {
-                let Ok(piece) = pieces.get(scene) else {
-                    continue;
-                };
-                let Some(material) =
-                    parts.profile_material(&piece.id, &piece.mid, profile, &materials)
-                else {
-                    continue;
-                };
-                let handle = materials.add(material);
-                for (e, _) in &meshes {
-                    if parents.iter_ancestors(e).any(|p| p == scene) {
-                        commands
-                            .entity(e)
-                            .remove::<MeshMaterial3d<StandardMaterial>>()
-                            .insert(MeshMaterial3d(handle.clone()));
-                    }
-                }
-            }
-            let weights: Vec<f32> = parts
-                .library
-                .morphs
-                .iter()
-                .enumerate()
-                .map(|(i, n)| {
-                    profile["morphs"][n]
-                        .as_f64()
-                        .unwrap_or(if (2..19).contains(&i) { 0.25 } else { 0. })
-                        .clamp(0., 0.5) as f32
-                })
-                .collect();
-            for (e, mut m) in &mut morphs {
-                if parents.iter_ancestors(e).any(|e| e == p.root)
-                    && m.weights().len() == weights.len()
-                {
-                    m.weights_mut().copy_from_slice(&weights);
-                }
-            }
-        }
-        for (e, _) in &meshes {
-            if parents.iter_ancestors(e).any(|e| e == p.root) {
-                commands.entity(e).insert((
-                    bevy::camera::visibility::NoFrustumCulling,
-                    bevy::camera::visibility::RenderLayers::from_layers(&[0, 28]),
-                ));
-            }
-        }
-        let pose = &initial_poses[id];
-        let basis = Mat4::from_cols(Vec4::X, -Vec4::Z, Vec4::Y, Vec4::W);
-        for &(entity, bone, parent) in &bindings {
-            let global = pose[bone] * basis;
-            let local = parent.map_or(global, |parent| (pose[parent] * basis).inverse() * global);
-            commands
-                .entity(entity)
-                .insert(Transform::from_matrix(local));
-        }
+        let bones = net
+            .remotes
+            .get(id)
+            .and_then(|r| r.poses.back())
+            .map(|p| p.bones.as_slice())
+            .unwrap_or(&[]);
+        loader.show(p, &bindings, &bone_globals(bones, &rig));
         if let Some(old) = skin.visible.replace(p.root) {
-            commands.entity(old).despawn();
+            loader.commands().entity(old).despawn();
         }
-        commands.entity(p.root).insert(Visibility::Inherited);
         info!("ONLINE_CHARACTER_VISIBLE peer={id} joints={} kind={}", bindings.len(),
             if matches!(p.look, Look::Imported(_)) { "import" } else { "retail" });
         skin.bindings = bindings;
@@ -381,38 +131,13 @@ fn bind(
     }
 }
 
-fn globals(bones: &[skate_net::Bone], skin: &RemoteSkins) -> Vec<Mat4> {
-    let mut result = vec![None; skin.rest.len()];
-    for b in bones {
-        if let Some(slot) = result.get_mut(b.index as usize) {
-            *slot = Some(network::matrix(b.pose));
-        }
-    }
-    fn visit(i: usize, skin: &RemoteSkins, result: &mut [Option<Mat4>]) -> Mat4 {
-        if let Some(m) = result[i] {
-            return m;
-        }
-        let p = skin.parents[i];
-        let matrix = if p >= 0 {
-            visit(p as usize, skin, result) * skin.rest[i]
-        } else {
-            skin.rest[i]
-        };
-        result[i] = Some(matrix);
-        matrix
-    }
-    for i in 0..result.len() {
-        visit(i, skin, &mut result);
-    }
-    result.into_iter().map(Option::unwrap).collect()
-}
 fn present(
     mut net: ResMut<Multiplayer>,
     vehicles: Res<crate::modding::vehicles::Vehicles>,
+    rig: Res<PuppetRig>,
     mut skins: ResMut<RemoteSkins>,
     mut nodes: Query<&mut Transform>,
 ) {
-    let basis = Mat4::from_cols(Vec4::X, -Vec4::Z, Vec4::Y, Vec4::W);
     let now = net.started.elapsed().as_secs_f64();
     for (&id, remote) in &net.remotes {
         let Some(mut skin) = skins.actors.remove(&id) else {
@@ -453,17 +178,7 @@ fn present(
                 {
                     continue;
                 }
-                let g = globals(&sample.bones, &skins);
-                let locals = skin
-                    .bindings
-                    .iter()
-                    .map(|&(_, i, parent)| {
-                        Transform::from_matrix(
-                            parent
-                                .map_or(g[i] * basis, |p| (g[p] * basis).inverse() * g[i] * basis),
-                        )
-                    })
-                    .collect();
+                let locals = pose_locals(&skin.bindings, &bone_globals(&sample.bones, &rig));
                 if skin.poses.insert(sample.captured, locals) {
                     skin.clock.observe(1, sample.captured, sample.received);
                 }
@@ -503,7 +218,7 @@ fn present(
         }
         let seated = remote.body.enabled & (1u64 << 62) != 0;
         for &(entity, i, _) in &skin.bindings {
-            if skins.board == Some(i) {
+            if rig.board == Some(i) {
                 if let Ok(mut t) = nodes.get_mut(entity) {
                     t.scale = Vec3::splat(if seated { 0.001 } else { 1. });
                 }
@@ -533,6 +248,7 @@ fn present(
 #[cfg(test)]
 mod online_owned_tests {
     use super::*;
+    use bevy::{mesh::skinning::SkinnedMesh, scene::SceneInstance};
     #[test]
     #[ignore = "requires SKATE3_ASSET_ROOT prepared owned assets"]
     fn online_appearance_owned_male_and_female_outfits_bind_every_clothing_rig() {

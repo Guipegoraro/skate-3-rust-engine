@@ -127,7 +127,9 @@ pub(crate) fn build(
     app.add_plugins(bevy_brp_extras::BrpExtrasPlugin);
     crate::teleport_menu::install(&mut app);
     app.add_plugins(crate::updater::UpdaterPlugin);
+    app.add_plugins(crate::puppet::PuppetPlugin);
     app.add_plugins(crate::multiplayer::MultiplayerPlugin);
+    app.add_plugins(crate::pedestrians::PedestriansPlugin);
     app.add_plugins(crate::scoring_hud::ScoringHudPlugin);
     app.add_systems(Last, crate::crash_context::sample);
     crate::profiling::install(&mut app);

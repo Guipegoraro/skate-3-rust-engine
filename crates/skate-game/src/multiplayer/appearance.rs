@@ -4,20 +4,13 @@ use super::{
     appearance_transfer::{Exchange, MAX_BLOB},
 };
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::OnceLock,
 };
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub(super) enum Look {
-    Stock,
-    Outfit(Value),
-    Native(String),
-    Imported(String),
-}
+pub(crate) use crate::puppet::Look;
 #[derive(Component)]
 pub(crate) struct RemoteCharacter;
 #[derive(Resource, Default)]

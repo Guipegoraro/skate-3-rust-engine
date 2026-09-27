@@ -109,6 +109,10 @@ impl CustomModels {
     pub(crate) fn online_native_path(&self, key: &str) -> Option<String> {
         self.entries.iter().find(|e|e.native.as_ref().is_some_and(|n|n.key==key)).map(|e|e.asset_path("character.glb"))
     }
+    /// Keys of the installed retail roster characters, e.g. for NPC variety (SK-034).
+    pub(crate) fn native_keys(&self) -> Vec<String> {
+        self.entries.iter().filter_map(|e| e.native.as_ref().map(|n| n.key.clone())).collect()
+    }
     pub(crate) fn native_style(&self) -> Option<&'static str> {
         self.active
             .as_ref()
