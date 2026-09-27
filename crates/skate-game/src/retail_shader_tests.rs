@@ -85,7 +85,11 @@ fn validate(bindless: bool, prepass: bool, extras: &[&str]) -> naga::Module {
         ),
         (
             "frame",
-            "#define_import_path bevy_pbr::mesh_view_bindings\nstruct View {view_from_world:mat4x4<f32>,viewport:vec4<f32>,world_position:vec3<f32>,padding:f32}\nstruct Light {flags:u32}\nstruct Lights {n_directional_lights:u32,directional_lights:array<Light,10>}\n@group(0) @binding(0) var<uniform> view:View;\n@group(0) @binding(1) var<storage> lights:Lights;",
+            "#define_import_path bevy_pbr::mesh_view_bindings\nstruct View {view_from_world:mat4x4<f32>,viewport:vec4<f32>,world_position:vec3<f32>,padding:f32}\nstruct Light {flags:u32}\nstruct Lights {n_directional_lights:u32,directional_lights:array<Light,10>}\n@group(0) @binding(0) var<uniform> view:View;\n@group(0) @binding(1) var<storage> lights:Lights;\n@group(0) @binding(16) var screen_space_ambient_occlusion_texture:texture_2d<f32>;\n@group(0) @binding(20) var depth_prepass_texture:texture_depth_2d;\n@group(0) @binding(24) var view_transmission_texture:texture_2d<f32>;\n@group(0) @binding(25) var view_transmission_sampler:sampler;",
+        ),
+        (
+            "view_transformations",
+            "#define_import_path bevy_pbr::view_transformations\nfn position_world_to_ndc(p:vec3<f32>)->vec3<f32> {return p;}\nfn ndc_to_uv(n:vec2<f32>)->vec2<f32> {return n;}\nfn depth_ndc_to_view_z(d:f32)->f32 {return -d;}",
         ),
         (
             "shadows",
@@ -166,6 +170,8 @@ fn validate(bindless: bool, prepass: bool, extras: &[&str]) -> naga::Module {
 fn material_shaders_validate() {
     for bindless in [false, true] {
         validate(bindless, false, &[]);
+        // Optional video effects (SK-052 SSAO, SK-053 SSR).
+        validate(bindless, false, &["SCREEN_SPACE_AMBIENT_OCCLUSION", "SKATE_SSR", "DEPTH_PREPASS"]);
         validate(bindless, true, &[]);
         validate(
             bindless,

@@ -127,6 +127,19 @@ impl Menu {
     pub(crate) fn video_effects(&self) -> (&crate::video_effects::VideoEffects, u32, bool) {
         (&self.settings.effects, self.settings.samples, self.settings.occlusion)
     }
+    #[cfg(test)]
+    pub(crate) fn for_tests(effects: crate::video_effects::VideoEffects) -> Self {
+        Menu {
+            open: false, selected: 0, settings: GraphicsSettings { effects, ..default() },
+            difficulty: Difficulty::Easy, path: PathBuf::new(), supported_msaa: vec![1, 2, 4, 8], status: String::new(),
+            multiplayer: false, browser: false, daylight: false, options: false, effects: false,
+            maps: vec![crate::map_library::Entry { label: "Test world".into(), path: None }], selected_map: 0,
+        }
+    }
+    #[cfg(test)]
+    pub(crate) fn set_video_effects(&mut self, effects: crate::video_effects::VideoEffects) {
+        self.settings.effects = effects;
+    }
     pub(crate) fn diagnostic_settings(&self) -> String {
         format!("{:?}", self.settings)
     }
@@ -311,7 +324,7 @@ fn setup(
         effects: false,
     });
 }
-fn msaa(samples: u32) -> Msaa {
+pub(crate) fn msaa(samples: u32) -> Msaa {
     match samples {
         2 => Msaa::Sample2,
         4 => Msaa::Sample4,

@@ -1,5 +1,8 @@
 #import bevy_pbr::{forward_io::VertexOutput, mesh_view_bindings as frame}
 #import bevy_pbr::shadows::fetch_directional_shadow
+#ifdef SKATE_SSR
+#import bevy_pbr::view_transformations
+#endif
 
 #import skate_retail::material_bindings as bindings
 #ifdef BINDLESS
@@ -11,6 +14,37 @@
 fn scaled_uv(uv: vec2<f32>, scale: f32) -> vec2<f32> {
     return vec2<f32>(uv.x*scale, 1.0-(1.0-uv.y)*scale);
 }
+
+#ifdef SKATE_SSR
+#ifdef DEPTH_PREPASS
+// Optional screen-space reflection (SK-053), not in the original. Marches the reflected ray
+// in growing world-space steps against the depth prepass and returns the opaque scene copy
+// (view transmission texture) at the hit, with alpha fading at screen edges, with distance
+// and on grazing misses.
+fn ssr_trace(origin: vec3<f32>, direction: vec3<f32>) -> vec4<f32> {
+    let size = frame::view.viewport.zw;
+    var t = 0.15;
+    for (var step = 0u; step < 32u; step += 1u) {
+        let point = origin+direction*t;
+        let ndc = view_transformations::position_world_to_ndc(point);
+        let uv = view_transformations::ndc_to_uv(ndc.xy);
+        if ndc.z <= 0.0 || any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0)) { break; }
+        let depth = textureLoad(frame::depth_prepass_texture,vec2<i32>(uv*size),0);
+        // Reverse Z: the ray is behind the scene when its depth is smaller.
+        if ndc.z < depth {
+            let behind = view_transformations::depth_ndc_to_view_z(depth)-view_transformations::depth_ndc_to_view_z(ndc.z);
+            if behind < 0.3+t*0.08 {
+                let edge = saturate(min(min(uv.x,1.0-uv.x),min(uv.y,1.0-uv.y))*8.0);
+                let fade = edge*(1.0-f32(step)/32.0);
+                return vec4<f32>(textureSampleLevel(frame::view_transmission_texture,frame::view_transmission_sampler,uv,0.0).rgb,fade);
+            }
+        }
+        t *= 1.22;
+    }
+    return vec4<f32>(0.0);
+}
+#endif
+#endif
 
 @fragment
 fn fragment(i: VertexOutput) -> @location(0) vec4<f32> {
@@ -241,7 +275,15 @@ fn fragment(i: VertexOutput) -> @location(0) vec4<f32> {
         if (fam == 5u || fam == 6u || fam == 13u) && (flags & 64u) != 0u {
             let rv = vd-2.0*wn*dot(vd,wn);
             let dir = vec3<f32>(-rv.x,-rv.y,rv.z);
-            let cube = bindings::sample_environment(slot,dir,log2(frame::view.viewport.w/640.0)).rgb;
+            var cube = bindings::sample_environment(slot,dir,log2(frame::view.viewport.w/640.0)).rgb;
+#ifdef SKATE_SSR
+#ifdef DEPTH_PREPASS
+            // SK-053: where the reflected ray hits something on screen, use it instead of the
+            // cube. The opaque copy already carries exposure (mode.w) and fog.
+            let hit = ssr_trace(i.world_position.xyz,-rv);
+            cube = mix(cube,hit.rgb/p.mode.w,hit.a);
+#endif
+#endif
             let rl = 0.3*saturate(4.0*masks.z-2.6);
             let lum = lml.g+rl*(1.0-lml.g);
             lin += cube*lum*masks.z*1.5;
@@ -249,6 +291,16 @@ fn fragment(i: VertexOutput) -> @location(0) vec4<f32> {
         if fam >= 7u { alpha = a.a; }
         if fam == 13u { alpha *= alpha; }
     }
+#ifdef SCREEN_SPACE_AMBIENT_OCCLUSION
+    // Optional SSAO (SK-052), not in the original. The lightmaps already hold baked
+    // occlusion, so only part of it (clock.z) applies; water keeps its own shading.
+    // clock.w=1 (SKATE_SSAO_DEBUG=1) shows the raw occlusion in grey.
+    if fam <= 13u {
+        let ao = textureLoad(frame::screen_space_ambient_occlusion_texture,vec2<i32>(i.position.xy),0i).r;
+        if frame_state.clock.w > 0.5 { return vec4<f32>(vec3<f32>(ao),1.0); }
+        lin *= mix(1.0,ao,frame_state.clock.z);
+    }
+#endif
     var f = saturate(length(rpos)*p.fog_ramp.x+p.fog_ramp.y);
     if p.fog_ramp.z != 1.0 { f = pow(max(f,1e-6),p.fog_ramp.z); }
     var fog_a = 1.0+p.fog_color.a*f;

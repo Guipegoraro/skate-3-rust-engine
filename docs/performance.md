@@ -235,3 +235,12 @@ At 200% + MSAA 4x with no controller connected: main schedule 6.2-6.9 ms -> 3.2-
 Runs are noisy (SD up to 30 FPS), but 200% + MSAA 8x is consistently the slowest (render
 prepare ~3.3 ms instead of ~1.5 ms). Recommendation: one player 200% + MSAA 2x or 4x
 (supersampling already smooths edges); two players side by side 100% + MSAA 4x.
+
+### Video effects (SK-051..055)
+
+`scripts/Test-VideoEffects.ps1 -Effects 'bloom=0','bloom=2','ssao=2' -Map <map> -Perf -Repeats 3`
+takes a screenshot and FPS runs per `SKATE_VIDEO_FX` value; each run starts from all effects off,
+so effects saved in `graphics.json` do not leak into the comparison. Costs are not measured yet
+(SK-063): the first night runs were contaminated by a saved SSAO Ultra setting, and the monitors then
+went to sleep, which stops the game from creating its swapchain. SSAO also forces MSAA off, so its
+A/B must be read against MSAA off (`SKATE_MSAA=1`).

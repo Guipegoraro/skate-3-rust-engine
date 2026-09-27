@@ -161,7 +161,11 @@ pub(crate) struct RetailWorldMaterial {
     pub shadow_state: Handle<bevy::render::storage::ShaderStorageBuffer>,
     pub alpha: AlphaMode,
     pub two_sided: bool,
+    /// Optional screen-space reflections (SK-053) on this reflective surface.
+    pub ssr: bool,
 }
+/// SK-053 menu state, read when a map builds its materials; `set_ssr` updates live ones.
+pub(crate) static SSR_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 impl From<&RetailWorldMaterial> for WorldParams {
     fn from(material: &RetailWorldMaterial) -> Self { material.params.clone() }
 }
@@ -175,6 +179,13 @@ pub(crate) struct WorldMaterialKey {
     two_sided: bool,
 }
 impl RetailWorldMaterial {
+    /// Reflective surfaces that sample the environment cube: families 5/6/13 with flag 64,
+    /// the ones the recomp's ssr.hlsl reflects (water is not included yet).
+    pub(crate) fn reflective(&self) -> bool {
+        let family = self.params.mode.x as u32;
+        matches!(family, 5 | 6 | 13) && (self.params.mode.y as u32) & 64 != 0
+            && matches!(self.alpha, AlphaMode::Opaque | AlphaMode::Mask(_))
+    }
     pub(crate) fn batch_key(&self) -> Option<WorldMaterialKey> {
         // Blended geometry keeps its previous mesh centers and sorting groups.
         let alpha = match self.alpha {
@@ -198,11 +209,13 @@ impl RetailWorldMaterial {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct RetailKey {
     two_sided: bool,
+    ssr: bool,
 }
 impl From<&RetailWorldMaterial> for RetailKey {
     fn from(m: &RetailWorldMaterial) -> Self {
         Self {
             two_sided: m.two_sided,
+            ssr: m.ssr,
         }
     }
 }
@@ -216,6 +229,11 @@ impl Material for RetailWorldMaterial {
     fn alpha_mode(&self) -> AlphaMode {
         self.alpha
     }
+    // SSR surfaces render after Bevy copies the opaque scene into the view transmission
+    // texture, which retail_world.wgsl raymarches against the depth prepass (SK-053).
+    fn reads_view_transmission_texture(&self) -> bool {
+        self.ssr
+    }
     fn specialize(
         _: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
@@ -228,6 +246,11 @@ impl Material for RetailWorldMaterial {
         } else {
             Some(bevy::render::render_resource::Face::Back)
         };
+        if key.bind_group_data.ssr {
+            if let Some(fragment) = descriptor.fragment.as_mut() {
+                fragment.shader_defs.push("SKATE_SSR".into());
+            }
+        }
         Ok(())
     }
 }
@@ -383,7 +406,7 @@ impl Definition {
         if self.family == 14 {
             water[1] = Vec4::new(self.scalar("uAnimationSpeed").unwrap_or(0.), self.scalar("vAnimationSpeed").unwrap_or(0.), 0., 0.);
         }
-        RetailWorldMaterial {
+        let mut material = RetailWorldMaterial {
             params: WorldParams {
                 mode: Vec4::new(
                     self.family as f32,
@@ -418,7 +441,10 @@ impl Definition {
             shadow_state: shadow::BUFFER,
             alpha,
             two_sided: self.flags & 4 != 0,
-        }
+            ssr: false,
+        };
+        material.ssr = material.reflective() && SSR_ENABLED.load(std::sync::atomic::Ordering::Relaxed);
+        material
     }
 }
 
@@ -502,3 +528,17 @@ impl MaterialTuning {
 }
 
 pub(crate) fn world_changed(mut messages: MessageReader<crate::map_transition::WorldChanged>) -> bool { messages.read().count() != 0 }
+
+/// Turns SSR on/off for loaded and future retail materials (SK-053). Only reflective materials
+/// whose flag differs are touched, so a toggle re-prepares a few hundred assets, not all.
+pub(crate) fn set_ssr(materials: &mut Assets<RetailWorldMaterial>, enabled: bool) -> usize {
+    SSR_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    let changed: Vec<_> = materials.iter()
+        .filter(|(_, m)| m.reflective() && m.ssr != enabled)
+        .map(|(id, _)| id)
+        .collect();
+    for id in &changed {
+        if let Some(mut material) = materials.get_mut(*id) { material.ssr = enabled; }
+    }
+    changed.len()
+}
