@@ -82,6 +82,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 - **Speedometer** example mod (`sdk/examples/speedometer`, SK-007): speed on the board and on foot plus top speed since the map loaded; km/h, mph or m/s; can be hidden in its settings.
 - `sdk.trainer.apply` has a new `run_speed` field (0.25..4) that scales on-foot walk, run and sprint speed (SK-025).
 - `sdk.physics.gravity(scale)` changes world gravity for mods (0.25..2), with its own owner; resets when the mod stops (SK-004).
+- `sdk.player.scale(s)` changes how big the skater and board look (0.5..2, visual only: collision, speed and jumps stay stock), with its own owner; example mod **Skater Size** (`sdk/examples/skater-size`) sets it from a slider (SK-038).
 - `sdk.player.impulse({x,y,z})` gives the skater an instant velocity boost while riding or in board air (SK-005).
 - Mod manifests can set `start_collapsed` so the mod's settings window opens minimized.
 - Fixed the native action IDs listed in [docs/lua-modding.md](docs/lua-modding.md).

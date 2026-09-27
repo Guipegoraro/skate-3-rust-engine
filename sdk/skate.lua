@@ -115,6 +115,9 @@ function sdk.trainer.apply(tuning) end
 ---@param velocity number[] {x,y,z} m/s world axes, length <= 20. Adds to the board and body velocity next tick. Riding (ground, powerslide, revert) and board physics air only; dropped in other states.
 function sdk.player.impulse(velocity) end
 
+---@param scale number Visual skater and board size 0.5..2; 1 restores stock. Collision, speeds and jumps stay stock size. One owner at a time; reset on disable/fault.
+function sdk.player.scale(scale) end
+
 sdk.physics = {}
 ---@param scale number World gravity multiplier 0.25..2; 1 restores stock. One owner at a time; reset on disable/fault.
 function sdk.physics.gravity(scale) end

@@ -1,0 +1,21 @@
+{
+  "id": "guipegoraro.skater-size",
+  "api": 1,
+  "name": "Skater Size",
+  "version": "1.0.0",
+  "author": "guipegoraro",
+  "description": "Makes the skater and board look bigger or smaller. Visual only: collision, speed and jumps stay the same.",
+  "entry": "main.lua",
+  "start_collapsed": true,
+  "settings": {
+    "size": {
+      "type": "number",
+      "label": "Size",
+      "description": "1 is the normal size.",
+      "min": 0.5,
+      "max": 2,
+      "step": 0.1,
+      "default": 1.0
+    }
+  }
+}

@@ -416,6 +416,7 @@ impl Plugin for PhysicsPlugin {
                 controls::sample.in_set(SimulationSet::Controls),
             )
             .add_systems(FixedUpdate, advance.in_set(SimulationSet::Physics))
+            .init_resource::<SkaterScale>()
             .add_systems(Update, present.in_set(FrameSet::Physics));
     }
 }
@@ -564,11 +565,21 @@ mod air_tests;
 #[path = "tests/wipeout_playback.rs"]
 mod wipeout_tests;
 
+/// Visual size of the local skater and board (SK-038, `sdk.player.scale`); physics stays stock size.
+#[derive(Resource)]
+pub(crate) struct SkaterScale(pub f32);
+impl Default for SkaterScale {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
 fn present(
     physics: Res<GamePhysics>,
     history: Res<crate::presentation::Presentation>,
     replay: Res<crate::replay::Replay>,
     time: Res<Time<Fixed>>,
+    scale: Res<SkaterScale>,
     mut roots: Query<&mut Transform, With<PlayerRoot>>,
 ) {
     if physics.failed {
@@ -578,6 +589,7 @@ fn present(
     for mut root in &mut roots {
         *root = crate::presentation::blend(previous.root, current.root,
             alpha);
+        root.scale *= scale.0;
     }
 }
 

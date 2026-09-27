@@ -17,6 +17,7 @@ pub(crate) struct Mods {
     animation_info: serde_json::Value,
     trainer: native_control::NativeControl<skate_mods::TrainerTuning>,
     gravity: native_control::NativeControl<native_control::Gravity>,
+    skater_scale: native_control::NativeControl<native_control::SkaterScale>,
     owned: BTreeMap<(String, String), Owned>,
     generation: u64,
     last_bail: bool,
@@ -76,6 +77,7 @@ impl Plugin for ModdingPlugin {
             animation_info,
             trainer: native_control::NativeControl::new("trainer"),
             gravity: native_control::NativeControl::new("gravity"),
+            skater_scale: native_control::NativeControl::new("skater scale"),
             manager: Manager::new(root, settings),
             owned: BTreeMap::new(),
             generation: u64::MAX,
@@ -229,6 +231,7 @@ fn apply(world: &mut World, mods: &mut Mods) {
     for id in &retired {
         mods.trainer.release(id);
         mods.gravity.release(id);
+        mods.skater_scale.release(id);
     }
     sync_native(world, mods);
     for id in &retired {
@@ -304,6 +307,7 @@ fn apply(world: &mut World, mods: &mut Mods) {
             vehicles::retire(world, &id);
             mods.trainer.release(&id);
             mods.gravity.release(&id);
+            mods.skater_scale.release(&id);
             sync_native(world, mods);
             world
                 .resource::<crate::physics::SkaterRuntime>()
@@ -335,6 +339,7 @@ fn sync_native(world: &mut World, mods: &Mods) {
     let mut physics = world.resource_mut::<crate::physics::GamePhysics>();
     physics.trainer = mods.trainer.value();
     physics.gravity = mods.gravity.value().0;
+    world.resource_mut::<crate::physics::SkaterScale>().0 = mods.skater_scale.value().0;
 }
 fn teleport_ready(world: &World) -> Result<(), String> {
     if world.resource::<vehicles::Vehicles>().occupied() { return Err("Exit the vehicle before teleporting the skater".into()); }
@@ -384,6 +389,10 @@ fn apply_one(world: &mut World, mods: &mut Mods, id: &str, command: Command) -> 
         }
         Command::Gravity { scale } => {
             mods.gravity.claim(id, native_control::Gravity(scale))?;
+            sync_native(world, mods);
+        }
+        Command::SkaterScale { scale } => {
+            mods.skater_scale.claim(id, native_control::SkaterScale(scale))?;
             sync_native(world, mods);
         }
         Command::Animation { path } => {

@@ -152,7 +152,7 @@ fn examples_load_and_run() {
     m.scan(true);
     assert!(m.diagnostics.is_empty(), "{:?}", m.diagnostics);
     let ids: Vec<_> = m.packages.keys().cloned().collect();
-    assert_eq!(ids, vec!["community.mario-kart", "community.native-trainer", "guipegoraro.dpad-tools", "guipegoraro.speedometer"]);
+    assert_eq!(ids, vec!["community.mario-kart", "community.native-trainer", "guipegoraro.dpad-tools", "guipegoraro.skater-size", "guipegoraro.speedometer"]);
     for id in ids {
         m.enable(&id, true).unwrap();
         for _ in 0..5 {

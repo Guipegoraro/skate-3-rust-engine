@@ -26,6 +26,10 @@ pub enum Command {
     Gravity {
         scale: f32,
     },
+    /// Visual skater size, 0.5..2; physics unchanged (SK-038).
+    SkaterScale {
+        scale: f32,
+    },
     /// Instant velocity change in m/s, world axes (SK-005).
     Impulse {
         velocity: [f32; 3],
@@ -70,6 +74,7 @@ impl Command {
                 velocity.iter().all(|v| v.is_finite()) && velocity.iter().map(|v| v * v).sum::<f32>() <= 400.
             }
             Self::Gravity { scale } => scale.is_finite() && (0.25..=2.).contains(scale),
+            Self::SkaterScale { scale } => scale.is_finite() && (0.5..=2.).contains(scale),
             Self::Animation { path } => !path.is_empty() && path.len() <= 256,
             Self::Log { text } => text.len() <= 2048,
             Self::Overlay { key, text } => crate::schema::valid_id(key) && text.len() <= 1024,

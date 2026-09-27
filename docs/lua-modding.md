@@ -235,6 +235,11 @@ offboard_jump, grip, turn_power, manual_drag and run_speed (0.25..4), and wobble
 Disable/reload/fault restores defaults; native contact/state conditions still apply.
 These are parameter multipliers, not guarantees of measured speed or height.
 
+`sdk.player.scale(scale)` changes the visual size of the local skater and board (0.5..2; 1 is stock).
+Only the rendered root is scaled around the skater's origin, so collision, speeds and jumps are unchanged,
+and remote players in multiplayer still see stock size. Like gravity, one mod owns it at a time and it
+resets when that mod stops (SK-038).
+
 `sdk.physics.gravity(scale)` multiplies world gravity (0.25..2; 1 is stock). It has its own
 owner, separate from the trainer, and resets on disable/reload/fault. It scales WorldGravity
 (integrator and trajectory predictions), the processed-input gravity (ollie velocity, early air)

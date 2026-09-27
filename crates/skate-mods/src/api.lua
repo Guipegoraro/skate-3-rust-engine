@@ -54,6 +54,8 @@ function sdk.trainer.apply(tuning) submit{kind="trainer",tuning=tuning} end
 sdk.physics = {}
 -- Gravity multiplier 0.25..2; 1 restores stock. One mod owns it at a time.
 function sdk.physics.gravity(scale) submit{kind="gravity",scale=scale} end
+-- Visual skater size 0.5..2 (physics unchanged); 1 restores stock. One mod owns it at a time.
+function sdk.player.scale(scale) submit{kind="skater_scale",scale=scale} end
 
 sdk.vehicle = {}
 function sdk.vehicle.spawn(key,definition,position,heading) submit{kind="vehicle_spawn",key=key,definition=definition,position=position,heading=heading or 0} end

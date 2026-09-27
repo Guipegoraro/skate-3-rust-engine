@@ -29,6 +29,15 @@ impl<T: Copy + Default> NativeControl<T> {
     }
 }
 
+/// Visual skater size; the default is stock size.
+#[derive(Clone, Copy)]
+pub(crate) struct SkaterScale(pub f32);
+impl Default for SkaterScale {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
 /// Gravity multiplier; the default is stock gravity.
 #[derive(Clone, Copy)]
 pub(crate) struct Gravity(pub f32);
