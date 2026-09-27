@@ -1,3 +1,5 @@
+> **Note:** this fork is vibe coded AI slop made for fun.
+
 <p align="center">
   <img src="docs/images/skating-crab.png" alt="Rust crab riding a skateboard" width="480">
 </p>
