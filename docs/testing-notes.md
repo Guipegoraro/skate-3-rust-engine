@@ -42,6 +42,11 @@ Add to it whenever a test teaches something new.
   flick distance with one ollie on open floor instead of guessing (`grind_snap.rs` `calibrate`).
 - **Why a gate rejects**: temporary `eprintln!` at each `return None` of the native gate, run the
   quick subset, then remove them; the sweep plus prints took ~2 min (SK-062 found the 11 deg angle gate).
+- **Feet and sounds** (SK-061): the physical skeleton's feet are `skater.skeleton.record.pose[15|19][3]`
+  (world position). Walking at ~1 m/s a foot plants every ~21 ticks; `walking_feet_plant_in_step` checks
+  walk/run/sprint. Animation attributes land in `skater.animation_input.extra` and are cleared at the end of
+  each tick: read a latch (like `animation_input.footsteps`), not the field. A temporary `eprintln!` in
+  `extended_attributes::dispatch` showed AudibleFootStepStrength only during the step-off, never in the walk.
 - **Blow-ups (NaN/inf)**: assert on the first lane that grows, not only on "finite", to find the
   feedback loop early (SK-025: the support velocity `w` lane).
 

@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-mod gameplay;
+pub(crate) mod gameplay;
 mod menu;
 pub(crate) use menu::MenuCursor;
 

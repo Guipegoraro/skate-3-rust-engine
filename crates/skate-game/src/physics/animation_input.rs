@@ -30,6 +30,26 @@ pub(crate) struct AnimationInput {
     right_toe: usize,
     settings: FinalizationInput,
     height_overrides: [bool; 5],
+    /// AudibleFootStepStrength latched before the end-of-tick clear (SK-061).
+    pub footsteps: AudibleFootsteps,
+}
+
+/// Footsteps marked by the stock OffBoard graph's AudibleFootStepStrength attribute
+/// (SK-061): one per rising edge, counted so a reader in another schedule sees each once.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct AudibleFootsteps {
+    pub count: u32,
+    pub strength: f32,
+    tick_strength: f32,
+}
+impl AudibleFootsteps {
+    pub fn record(&mut self, strength: f32) {
+        if strength > 0.0 && self.tick_strength <= 0.0 {
+            self.count = self.count.wrapping_add(1);
+            self.strength = strength;
+        }
+        self.tick_strength = strength;
+    }
 }
 
 impl AnimationInput {
@@ -62,6 +82,7 @@ impl AnimationInput {
                 .map(|n| encode(n.as_bytes()))
                 .collect(),
             right_toe,
+            footsteps: AudibleFootsteps::default(),
             settings: FinalizationInput {
                 //TU3 global constructor8289F8B4 binds292 to anim_motion
                 //collectionAC260B44FA3CA0A4 (jumping), not a default profile.
@@ -110,6 +131,7 @@ impl AnimationInput {
     pub fn finish_output_publication(&mut self) {
         self.output.grind_name = encode(b"");
         self.output.flags &= 0x003fffff;
+        self.footsteps.record(self.extra.footstep_strength);
         self.extra.footstep_strength = 0.0;
     }
 
@@ -145,5 +167,21 @@ impl AnimationInput {
             settings,
             Some(map),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AudibleFootsteps;
+
+    #[test]
+    fn footsteps_count_each_marked_plant_once() {
+        // AudibleFootStepStrength per tick: a plant held 3 ticks, a one-tick plant, then a
+        // plant right after a gap of one tick.
+        let curve = [0.0, 0.8, 0.8, 0.8, 0.0, 0.0, 0.5, 0.0, 1.0, 1.0];
+        let mut steps = AudibleFootsteps::default();
+        let counts: Vec<u32> = curve.iter().map(|&s| { steps.record(s); steps.count }).collect();
+        assert_eq!(counts, [0, 1, 1, 1, 1, 1, 2, 2, 3, 3]);
+        assert_eq!(steps.strength, 1.0);
     }
 }

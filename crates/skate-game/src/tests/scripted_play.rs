@@ -229,3 +229,41 @@ fn university_ollies_and_mounts_stay_finite() {
         eprintln!("SK031 spot {spot:?} ok");
     }
 }
+
+/// SK-061: walking on foot, footsteps follow the physical skeleton's foot plants
+/// (`audio::gameplay::FootPlants`). The stock OffBoard graph's AudibleFootStepStrength
+/// marks only come with the step-off, not the walk.
+#[test]
+#[ignore = "requires private stock assets; SK-061 footsteps"]
+fn walking_feet_plant_in_step() {
+    use crate::audio::gameplay::{FOOT_PARTS, FootPlants};
+    let assets = Assets::load();
+    for (label, buttons, stick) in [("walk", 0, 16000), ("run", 0, 32767), ("sprint", A, 32767)] {
+        let mut s = Session::flat(&assets, |_| {});
+        for tick in 0..120 {
+            s.step(if tick == 20 { Y } else { 0 }, [0; 2]).unwrap();
+        }
+        let mut plants = FootPlants::default();
+        let mut steps = Vec::new();
+        let start = s.root_position();
+        for tick in 0..300usize {
+            s.step(buttons, [0, stick]).unwrap();
+            let pose = &s.skater.skeleton.record.pose;
+            let foot = |i: usize| [pose[i][3][0], pose[i][3][1], pose[i][3][2]];
+            let feet = [foot(FOOT_PARTS[0]), foot(FOOT_PARTS[1])];
+            if std::env::var_os("SK061_TRACE").is_some() && tick < 90 {
+                eprintln!("SK061 {label} tick{tick} feet {:.3?}", feet);
+            }
+            if plants.update(feet, 1.0 / 60.0) > 0 {
+                steps.push(tick);
+            }
+        }
+        let end = s.root_position();
+        let distance = ((end[0] - start[0]).powi(2) + (end[2] - start[2]).powi(2)).sqrt();
+        let gaps: Vec<usize> = steps.windows(2).map(|w| w[1] - w[0]).collect();
+        eprintln!("SK061 {label}: {distance:.1} m, {} steps, gaps {gaps:?}", steps.len());
+        assert!(steps.len() >= 6, "{label}: only {} footsteps in 5 s", steps.len());
+        // Skip the first steps while the walk starts up.
+        assert!(gaps.iter().skip(2).all(|&g| (8..=45).contains(&g)), "{label}: step gaps {gaps:?}");
+    }
+}

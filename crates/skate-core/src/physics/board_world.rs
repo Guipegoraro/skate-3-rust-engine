@@ -33,6 +33,8 @@ pub struct WorldTriangle {
 pub struct WorldLineHit {
     pub geometry: TriangleLineHit,
     pub tag: u32,
+    /// Canonical triangle index, e.g. for its authored packed surface.
+    pub triangle: usize,
 }
 
 impl WorldTriangle {
@@ -189,6 +191,12 @@ impl BoardWorld {
         &self.triangles
     }
 
+    /// Authored packed surface of a triangle (low7 audio surface, next5 physics
+    /// category), when the world has query metadata.
+    pub fn packed_surface(&self, triangle: usize) -> Option<u16> {
+        self.query_metadata.as_ref()?.packed_surfaces.get(triangle).copied()
+    }
+
     /// Board wheel segments use zero query radius; rounded world triangles
     /// still select the native swept branch through their own fatness.
     pub fn query_thin_line(
@@ -212,7 +220,7 @@ impl BoardWorld {
         }
         let direction = Vector3::new(end.x - start.x, end.y - start.y, end.z - start.z);
         let mut nearest: Option<WorldLineHit> = None;
-        for (_, entry) in self.line_candidates(start, end, radius) {
+        for (index, entry) in self.line_candidates(start, end, radius) {
             let mut geometry = TriangleLineHit {
                 position: Vector3::ZERO,
                 normal: Vector3::ZERO,
@@ -234,6 +242,7 @@ impl BoardWorld {
                     nearest = Some(WorldLineHit {
                         geometry,
                         tag: entry.tag,
+                        triangle: index,
                     });
                 }
             }
