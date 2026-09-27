@@ -1,0 +1,39 @@
+# offboard 1
+6 y 0 0 0 0
+150 - 0 0 0 0
+# walk 1
+240 - 0 0.6 0 0
+# stop 1
+90 - 0 0 0 0
+# run 1
+240 - 0 1 0 0
+# stop 2
+90 - 0 0 0 0
+# menu open 1
+6 start 0 0 0 0
+120 - 0 0 0 0
+# menu down 1
+6 down 0 0 0 0
+50 - 0 0 0 0
+# menu down 2
+6 down 0 0 0 0
+50 - 0 0 0 0
+# menu down 3
+6 down 0 0 0 0
+50 - 0 0 0 0
+# menu down 4
+6 down 0 0 0 0
+50 - 0 0 0 0
+# menu up 1
+6 up 0 0 0 0
+50 - 0 0 0 0
+# menu up 2
+6 up 0 0 0 0
+50 - 0 0 0 0
+# menu back 1
+6 b 0 0 0 0
+120 - 0 0 0 0
+# onboard 1
+6 y 0 0 0 0
+150 - 0 0 0 0
+# end

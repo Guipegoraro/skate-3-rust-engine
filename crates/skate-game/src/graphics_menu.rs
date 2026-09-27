@@ -120,6 +120,11 @@ impl Menu {
     pub(crate) fn diagnostic_settings(&self) -> String {
         format!("{:?}", self.settings)
     }
+    /// Menu position for UI sounds (SK-022): open, page (main/options/multiplayer/daylight), row.
+    pub(crate) fn sound_cursor(&self) -> crate::audio::MenuCursor {
+        let page = if self.daylight { 3 } else if self.options { 1 } else if self.multiplayer { 2 } else { 0 };
+        crate::audio::MenuCursor { open: self.open, page, row: self.selected }
+    }
     pub(crate) fn transition_finished(&mut self, status: String, resume: bool) {
         self.status = status;
         self.open = !resume;

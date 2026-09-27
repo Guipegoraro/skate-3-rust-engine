@@ -13,8 +13,31 @@ Skate3Recomp runtime decodes and matching them byte for byte against the disc ba
    and `ninja -C ../rexglue-audiotrace-build rexruntime` (output: `../rexglue-audiotrace/out/win-amd64/rexruntime.dll`).
 2. Run: `scripts/Run-Skate3RecompTrace.ps1` copies `skate3.exe` + the traced DLL to `../s3r-trace-run`
    (game/dlc as junctions, the install is untouched) and sets `REX_XMA_TRACE`.
-3. Match: `python tools/audio_trace_match.py logs/xma-trace-<date>.log <game folder>` prints
-   time, XMA context and `<bank>/<index>` per buffer (same ids as `audio.json`).
+3. Match: `python tools/audio_trace_match.py logs/xma-trace-<date>.log <game folder> --known` prints
+   time, XMA context and `<bank>/<index>` per buffer (same ids as `audio.json`; ABK banks are
+   resolved to their subsong by the sample count in `audio.json`).
 
-The patch only adds logging when `REX_XMA_TRACE` is set. It also drops two `RasterizerGamma`
+## Without a player (scripted pad)
+
+`scripts/Run-Skate3RecompTrace.ps1 -Automate` starts the game windowed with the recomp's own
+demo path (`--skate3_demo_path=true` boots through the menus into the plaza, about 20 s) and
+`--mnk_mode=true` (a virtual pad that answers even when the window is not focused). The patched
+runtime then reads the pad from `logs/pad-script.txt` (`REX_PAD_SCRIPT`), replaying it from the
+top whenever the file changes:
+
+```
+# ollie 1              marker: written into the trace as "# <ms> ollie 1" when reached
+12 - 0 0 0 -1          <polls> <buttons|-> <lx> <ly> <rx> <ry> [lt] [rt]; ~60 polls per second
+5 a+rb 0 0.5 0 1       buttons: a b x y start back lb rb l3 r3 up down left right
+```
+
+Copy a scenario from `scenarios/` (five pushes and ollies; walking plus pause-menu navigation)
+to `logs/pad-script.txt`, wait for its `end` marker in the trace, then summarise what follows
+each action: `--recurring ollie 2.2` lists the ids that start within 2.2 s after most
+`ollie <n>` markers. Pedestrians, other skaters and ambience play all the time, so only ids that
+recur after every repetition count. Screenshots of the window: `PrintWindow` with flag 3
+(`PW_RENDERFULLCONTENT`) captures the D3D12 frame without focusing the window.
+
+The patch only adds logging when `REX_XMA_TRACE` is set, and the scripted pad only when
+`REX_PAD_SCRIPT` is set. It also drops two `RasterizerGamma`
 lines from the debug UI, a field that only exists in the fork's imgui.

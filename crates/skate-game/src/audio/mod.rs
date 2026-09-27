@@ -1,6 +1,8 @@
 //! Sound framework (SK-021). Setup decodes the original banks to assets/private/audio with an
 //! `audio.json` index; `events.json` maps named events to those sounds.
-//! - One-shots: write a `PlaySound` message with the event name.
+//! - One-shots: write a `PlaySound` message with the event name. An event's `layers` play with
+//!   it, like the original game's stacked samples (pop = tail + trucks + air): a layer is another
+//!   event (its own variations and volume) or a sound id (played at the event's volume).
 //! - Loops: call `SoundLoops::set(key, event, volume, pitch)` every frame the loop should play;
 //!   a loop that is not set in a frame stops. Volume and pitch follow the latest call.
 //! Channel volumes (master, music, effects) come from the Game options page.
@@ -11,6 +13,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 mod gameplay;
+mod menu;
+pub(crate) use menu::MenuCursor;
 
 const EVENTS: &str = include_str!("events.json");
 
@@ -20,7 +24,7 @@ impl Plugin for AudioPlugin {
         app.add_message::<PlaySound>()
             .init_resource::<SoundLoops>()
             .add_systems(Startup, (load, smoke_test).chain())
-            .add_systems(Update, (session_marker, gameplay::state_sounds, gameplay::loop_sounds, play, reconcile_loops).chain());
+            .add_systems(Update, (session_marker, gameplay::state_sounds, gameplay::loop_sounds, menu::pause_menu_sounds, play, reconcile_loops).chain());
     }
 }
 
@@ -47,6 +51,9 @@ pub(crate) struct EventDef {
     pub pitch_jitter: f32,
     #[serde(default)]
     pub channel: Channel,
+    /// Events or sound ids played at the same time (one level deep).
+    #[serde(default)]
+    pub layers: Vec<String>,
 }
 fn one() -> f32 {
     1.0
@@ -98,6 +105,19 @@ impl SoundLibrary {
         })
     }
     /// Picks a sound and its jittered volume/pitch; None if the event or its sounds are unknown.
+    /// The event and its layers, each resolved once; layers of layers are ignored.
+    pub fn resolve_layered(&mut self, event: &str) -> Vec<Resolved> {
+        let Some(def) = self.events.get(event).cloned() else { return Vec::new() };
+        let mut sounds: Vec<Resolved> = self.resolve(event).into_iter().collect();
+        for layer in &def.layers {
+            if self.events.contains_key(layer) {
+                sounds.extend(self.resolve(layer));
+            } else if let Some(file) = self.files.get(layer) {
+                sounds.push(Resolved { file: file.clone(), volume: def.volume, speed: 1.0, channel: def.channel });
+            }
+        }
+        sounds
+    }
     pub fn resolve(&mut self, event: &str) -> Option<Resolved> {
         let def = self.events.get(event)?;
         let available: Vec<&String> = def.sounds.iter().filter(|id| self.files.contains_key(*id)).collect();
@@ -177,13 +197,14 @@ fn play(
     assets: Res<AssetServer>,
 ) {
     for PlaySound(event) in requests.read() {
-        let Some(sound) = library.resolve(event) else { continue };
-        let volume = sound.volume * channel_volume(&options, sound.channel);
-        commands.spawn((
-            Name::new(format!("Sound {event}")),
-            AudioPlayer::new(assets.load(sound.file)),
-            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume)).with_speed(sound.speed),
-        ));
+        for sound in library.resolve_layered(event) {
+            let volume = sound.volume * channel_volume(&options, sound.channel);
+            commands.spawn((
+                Name::new(format!("Sound {event}")),
+                AudioPlayer::new(assets.load(sound.file)),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume)).with_speed(sound.speed),
+            ));
+        }
     }
 }
 
@@ -270,8 +291,26 @@ mod tests {
     }
 
     #[test]
+    fn layers_play_with_their_event_one_level_deep() {
+        let events = r#"{
+            "pop":{"sounds":["GRINDS/1"],"volume":0.5,"layers":["board","GRINDS/1","MISSING/1"]},
+            "board":{"sounds":["GRINDS/2"],"layers":["pop"]}}"#;
+        let mut library = SoundLibrary::new(MANIFEST, events).unwrap();
+        let sounds = library.resolve_layered("pop");
+        let files: Vec<&str> = sounds.iter().map(|s| s.file.as_str()).collect();
+        assert_eq!(files, ["private/audio/GRINDS/1.wav", "private/audio/GRINDS/2.wav", "private/audio/GRINDS/1.wav"]);
+        assert_eq!(sounds[2].volume, 0.5, "a sound-id layer uses the event's volume");
+        assert!(library.resolve_layered("unknown").is_empty());
+    }
+
+    #[test]
     fn shipped_event_table_parses() {
-        SoundLibrary::new(MANIFEST, EVENTS).unwrap();
+        let library = SoundLibrary::new(MANIFEST, EVENTS).unwrap();
+        for (name, def) in &library.events {
+            for layer in &def.layers {
+                assert!(library.events.contains_key(layer) || layer.contains('/'), "{name}: unknown layer {layer}");
+            }
+        }
     }
 
     #[test]

@@ -1,10 +1,20 @@
 {
-  "_comment": "Sound events (SK-021/022). Each event picks one of its sounds (ids from assets/private/audio/audio.json, '<bank>/<index>') at random. volume 0..2, *_jitter are +- fractions, channel is effects or music. Adding a sound = one entry here. The gameplay picks below are PROVISIONAL: choose by ear with `python tools/audio_browser.py assets` and replace the ids.",
+  "_comment": "Sound events (SK-021/022). Each event picks one of its sounds (ids from assets/private/audio/audio.json, '<bank>/<index>') at random and plays its layers with it (other events, or sound ids at the event's volume). volume 0..2, *_jitter are +- fractions, channel is effects or music. Adding a sound = one entry here. pop, land, rolling, wind and menu_* come from Skate3Recomp traces of the original game (SK-032, tools/recomp_trace); grind_* and bail are still provisional picks.",
   "grind_test": { "sounds": ["GRINDS/1", "GRINDS/2", "GRINDS/3"], "volume": 0.8, "pitch_jitter": 0.05 },
-  "pop": { "sounds": ["Skate_Collisions/1", "Skate_Collisions/2", "Skate_Collisions/3", "Skate_Collisions/4"], "volume": 0.9, "pitch_jitter": 0.04 },
-  "land": { "sounds": ["Skate_Collisions/5", "Skate_Collisions/6", "Skate_Collisions/7", "Skate_Collisions/8"], "volume": 1.0, "pitch_jitter": 0.04 },
+  "pop": { "sounds": ["Skate_Collisions/261", "Skate_Collisions/263", "Skate_Collisions/264", "Skate_Collisions/265"], "volume": 0.9, "pitch_jitter": 0.03, "layers": ["pop_trucks", "pop_board", "pop_air"] },
+  "pop_trucks": { "sounds": ["Skate_Collisions/639", "Skate_Collisions/640", "Skate_Collisions/641", "Skate_Collisions/644", "Skate_Collisions/645", "Skate_Collisions/646", "Skate_Collisions/647"], "volume": 0.7, "pitch_jitter": 0.03 },
+  "pop_board": { "sounds": ["Skate_Collisions/624", "Skate_Collisions/625", "Skate_Collisions/626", "Skate_Collisions/627"], "volume": 0.6 },
+  "pop_air": { "sounds": ["Sk8_Air_Flip_Tricks/11", "Sk8_Air_Flip_Tricks/12", "Sk8_Air_Flip_Tricks/13", "Sk8_Air_Flip_Tricks/14"], "volume": 0.5 },
+  "land": { "sounds": ["Skate_Collisions/397", "Skate_Collisions/398", "Skate_Collisions/400", "Skate_Collisions/401", "Skate_Collisions/402", "Skate_Collisions/403"], "volume": 1.0, "pitch_jitter": 0.03, "layers": ["land_board", "land_trucks"] },
+  "land_board": { "sounds": ["Skate_Collisions/786", "Skate_Collisions/790", "Skate_Collisions/794", "Skate_Collisions/798", "Skate_Collisions/805", "Skate_Collisions/813", "Skate_Collisions/814", "Skate_Collisions/816", "Skate_Collisions/818", "Skate_Collisions/822", "Skate_Collisions/823", "Skate_Collisions/824"], "volume": 0.8 },
+  "land_trucks": { "sounds": ["Skate_Collisions/85", "Skate_Collisions/86", "Skate_Collisions/87", "Skate_Collisions/88"], "volume": 0.7 },
   "grind_start": { "sounds": ["GRINDS/1", "GRINDS/2", "GRINDS/3"], "volume": 0.8, "pitch_jitter": 0.05 },
-  "rolling": { "sounds": ["Rolling_Rattles/1"], "volume": 0.6 },
+  "rolling": { "sounds": ["Rolling_Rattles/7", "Rolling_Rattles/8"], "volume": 0.6 },
+  "wind": { "sounds": ["sense_of_speed/4"], "volume": 0.5 },
+  "wind_2": { "sounds": ["sense_of_speed/5"], "volume": 0.5 },
   "grind_loop": { "sounds": ["GRINDS/1"], "volume": 0.8 },
-  "bail": { "sounds": ["Bodyslide/1", "Bodyslide/2", "Bodyslide/3"], "volume": 1.0, "pitch_jitter": 0.05 }
+  "bail": { "sounds": ["Bodyslide/1", "Bodyslide/2", "Bodyslide/3"], "volume": 1.0, "pitch_jitter": 0.05 },
+  "menu_move": { "sounds": ["sk8_menu/53"], "volume": 0.6, "layers": ["sk8_menu/54"] },
+  "menu_open": { "sounds": ["sk8_menu/60"], "volume": 0.6, "layers": ["sk8_menu/24", "sk8_menu/50", "sk8_menu/46"] },
+  "menu_close": { "sounds": ["sk8_menu/46"], "volume": 0.6, "layers": ["sk8_menu/40", "sk8_menu/11"] }
 }

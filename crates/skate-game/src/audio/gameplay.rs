@@ -57,7 +57,13 @@ pub(crate) fn rolling_mix(speed: f32) -> Option<(f32, f32)> {
     })
 }
 
-/// Continuous loops: rolling on the board, grinding.
+/// Wind on the board (SK-023, sense_of_speed like the original): silent below 4 m/s, full at
+/// 14 m/s.
+pub(crate) fn wind_mix(speed: f32) -> Option<f32> {
+    (speed >= 4.0).then(|| ((speed - 4.0) / 10.0).clamp(0.0, 1.0))
+}
+
+/// Continuous loops: rolling on the board, wind, grinding.
 pub(super) fn loop_sounds(
     skater: Option<Res<crate::physics::SkaterRuntime>>,
     physics: Option<Res<crate::physics::GamePhysics>>,
@@ -79,6 +85,13 @@ pub(super) fn loop_sounds(
     }
     if grind(state) {
         loops.set("grind", "grind_loop", 0.8, 0.9 + (speed / 20.0).min(0.3));
+    }
+    // The original plays two sense_of_speed layers together.
+    if on_board_ground(state) || board_air(state) || grind(state) {
+        if let Some(volume) = wind_mix(speed) {
+            loops.set("wind", "wind", volume, 1.0);
+            loops.set("wind_2", "wind_2", volume, 1.0);
+        }
     }
 }
 
@@ -105,5 +118,12 @@ mod tests {
         let (fast, fast_pitch) = rolling_mix(12.0).unwrap();
         assert!(slow < fast && slow_pitch < fast_pitch);
         assert_eq!((fast, fast_pitch), (1.0, 1.2));
+    }
+
+    #[test]
+    fn wind_starts_at_speed() {
+        assert_eq!(wind_mix(3.0), None);
+        assert_eq!(wind_mix(4.0), Some(0.0));
+        assert_eq!(wind_mix(30.0), Some(1.0));
     }
 }

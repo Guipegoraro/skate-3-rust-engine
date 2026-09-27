@@ -1,8 +1,8 @@
 diff --git a/src/audio/xma_context.cpp b/src/audio/xma_context.cpp
-index 98734ba..18cba08 100644
+index 98734ba..8e23cc8 100644
 --- a/src/audio/xma_context.cpp
 +++ b/src/audio/xma_context.cpp
-@@ -35,6 +35,34 @@ extern "C" {
+@@ -35,6 +35,51 @@ extern "C" {
  #endif
  }  // extern "C"
  
@@ -14,20 +14,37 @@ index 98734ba..18cba08 100644
 +#include <cstdlib>
 +#include <mutex>
 +#include <unordered_map>
++namespace rex::audio_trace {
++// Shared with the SK-032 pad script (xam_input.cpp) so its markers use the same clock and file.
++std::mutex& Mutex() { static std::mutex mutex; return mutex; }
++FILE* File() {
++  static const char* path = std::getenv("REX_XMA_TRACE");
++  static FILE* file = path ? std::fopen(path, "a") : nullptr;
++  return file;
++}
++long long Ms() {
++  static const auto start = std::chrono::steady_clock::now();
++  return std::chrono::duration_cast<std::chrono::milliseconds>(
++             std::chrono::steady_clock::now() - start).count();
++}
++void Marker(const char* text) {
++  std::lock_guard<std::mutex> lock(Mutex());
++  if (FILE* file = File()) {
++    std::fprintf(file, "# %lld %s\n", Ms(), text);
++    std::fflush(file);
++  }
++}
++}  // namespace rex::audio_trace
 +namespace {
 +void TraceXmaInput(uint32_t context, const uint8_t* buffer, uint32_t size) {
-+  static const char* path = std::getenv("REX_XMA_TRACE");
-+  if (!path || !buffer) return;
-+  static std::mutex mutex;
++  using namespace rex::audio_trace;
++  if (!buffer || !File()) return;
 +  static std::unordered_map<uint32_t, const uint8_t*> last;
-+  static FILE* file = std::fopen(path, "a");
-+  static const auto start = std::chrono::steady_clock::now();
-+  std::lock_guard<std::mutex> lock(mutex);
-+  if (!file || last[context] == buffer) return;
++  std::lock_guard<std::mutex> lock(Mutex());
++  if (last[context] == buffer) return;
 +  last[context] = buffer;
-+  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-+                      std::chrono::steady_clock::now() - start).count();
-+  std::fprintf(file, "%lld %u %u ", static_cast<long long>(ms), context, size);
++  FILE* file = File();
++  std::fprintf(file, "%lld %u %u ", Ms(), context, size);
 +  for (uint32_t i = 0; i < 32 && i < size; ++i) std::fprintf(file, "%02x", buffer[i]);
 +  std::fputc('\n', file);
 +  std::fflush(file);
@@ -37,7 +54,7 @@ index 98734ba..18cba08 100644
  // Credits for most of this code goes to:
  // https://github.com/koolkdev/libertyv/blob/master/libav_wrapper/xma2dec.c
  
-@@ -109,6 +137,13 @@ bool XmaContext::Work() {
+@@ -109,6 +154,13 @@ bool XmaContext::Work() {
    }
  
    std::lock_guard<std::mutex> lock(lock_);
@@ -51,7 +68,7 @@ index 98734ba..18cba08 100644
    if (REXCVAR_GET(xma_use_old_decoder)) {
      return WorkOldFrameDecoder();
    }
-@@ -653,6 +688,7 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+@@ -653,6 +705,7 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
    }
  
    uint8_t* current_input_buffer = GetCurrentInputBuffer(data);
@@ -59,6 +76,135 @@ index 98734ba..18cba08 100644
  
    input_buffer_.fill(0);
  
+diff --git a/src/kernel/xam/xam_input.cpp b/src/kernel/xam/xam_input.cpp
+index caa3538..7b5032b 100644
+--- a/src/kernel/xam/xam_input.cpp
++++ b/src/kernel/xam/xam_input.cpp
+@@ -25,6 +25,116 @@
+ #include <iterator>
+ #include <mutex>
+ 
++// skate-3-rust-engine SK-032 scripted pad: with REX_PAD_SCRIPT=<file>, the pad state of user 0
++// is driven from that file, reloaded (and replayed from the top) whenever it changes. One step
++// per line: "<polls> <buttons|-> <lx> <ly> <rx> <ry> [lt] [rt]", buttons like a+rb, sticks and
++// triggers -1..1 / 0..1; "# text" writes a marker into the REX_XMA_TRACE log when reached.
++// Needs a connected pad for GetState to succeed (e.g. --mnk_mode=true, which works unfocused).
++#include <chrono>
++#include <cstdlib>
++#include <filesystem>
++#include <fstream>
++#include <sstream>
++#include <string>
++#include <vector>
++namespace rex::audio_trace { void Marker(const char* text); }
++namespace {
++struct PadStep {
++  uint32_t polls = 0;
++  uint16_t buttons = 0;
++  float values[6] = {};  // lx ly rx ry lt rt
++  std::string marker;
++};
++std::mutex g_pad_mutex;
++std::vector<PadStep> g_pad_steps;
++size_t g_pad_index = 0;
++uint32_t g_pad_polls = 0;
++std::filesystem::file_time_type g_pad_stamp{};
++std::chrono::steady_clock::time_point g_pad_next_check{};
++
++uint16_t PadButtons(const std::string& text) {
++  static const std::pair<const char*, uint16_t> names[] = {
++      {"a", 0x1000}, {"b", 0x2000}, {"x", 0x4000}, {"y", 0x8000}, {"start", 0x0010},
++      {"back", 0x0020}, {"lb", 0x0100}, {"rb", 0x0200}, {"l3", 0x0040}, {"r3", 0x0080},
++      {"up", 0x0001}, {"down", 0x0002}, {"left", 0x0004}, {"right", 0x0008}};
++  uint16_t buttons = 0;
++  std::stringstream stream(text);
++  std::string name;
++  while (std::getline(stream, name, '+')) {
++    for (const auto& [key, bit] : names) {
++      if (name == key) buttons |= bit;
++    }
++  }
++  return buttons;
++}
++
++void ReloadPadScriptLocked(const char* path) {
++  std::error_code error;
++  const auto stamp = std::filesystem::last_write_time(path, error);
++  if (error || stamp == g_pad_stamp) return;
++  g_pad_stamp = stamp;
++  g_pad_steps.clear();
++  std::ifstream file(path);
++  std::string line;
++  while (std::getline(file, line)) {
++    PadStep step;
++    if (!line.empty() && line[0] == '#') {
++      step.marker = line.substr(line.find_first_not_of("# ") == std::string::npos ? line.size() : line.find_first_not_of("# "));
++      g_pad_steps.push_back(step);
++      continue;
++    }
++    std::stringstream stream(line);
++    std::string buttons;
++    if (!(stream >> step.polls >> buttons)) continue;
++    step.buttons = PadButtons(buttons);
++    for (float& value : step.values) {
++      if (!(stream >> value)) break;
++    }
++    g_pad_steps.push_back(step);
++  }
++  g_pad_index = 0;
++  g_pad_polls = 0;
++}
++
++void ApplyPadScript(rex::input::X_INPUT_STATE* state) {
++  if (!state) return;
++  static const char* path = std::getenv("REX_PAD_SCRIPT");
++  if (!path) return;
++  std::lock_guard lock(g_pad_mutex);
++  const auto now = std::chrono::steady_clock::now();
++  if (now >= g_pad_next_check) {
++    g_pad_next_check = now + std::chrono::milliseconds(100);
++    ReloadPadScriptLocked(path);
++  }
++  while (g_pad_index < g_pad_steps.size() && g_pad_steps[g_pad_index].polls == 0) {
++    if (!g_pad_steps[g_pad_index].marker.empty()) {
++      rex::audio_trace::Marker(g_pad_steps[g_pad_index].marker.c_str());
++    }
++    ++g_pad_index;
++  }
++  if (g_pad_index >= g_pad_steps.size()) return;
++  const PadStep& step = g_pad_steps[g_pad_index];
++  auto axis = [](float value) {
++    return static_cast<int16_t>(std::clamp(value, -1.0f, 1.0f) * 32767.0f);
++  };
++  auto trigger = [](float value) {
++    return static_cast<uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f);
++  };
++  state->gamepad.buttons = static_cast<uint16_t>(state->gamepad.buttons) | step.buttons;
++  state->gamepad.thumb_lx = axis(step.values[0]);
++  state->gamepad.thumb_ly = axis(step.values[1]);
++  state->gamepad.thumb_rx = axis(step.values[2]);
++  state->gamepad.thumb_ry = axis(step.values[3]);
++  state->gamepad.left_trigger = trigger(step.values[4]);
++  state->gamepad.right_trigger = trigger(step.values[5]);
++  state->packet_number = static_cast<uint32_t>(state->packet_number) + 1;
++  if (++g_pad_polls >= step.polls) {
++    g_pad_polls = 0;
++    ++g_pad_index;
++  }
++}
++}  // namespace
++
+ #pragma GCC diagnostic ignored "-Wunused-parameter"
+ 
+ namespace rex {
+@@ -246,6 +356,7 @@ u32 XamInputGetState_entry(u32 user_index, u32 flags, ppc_ptr_t<X_INPUT_STATE> i
+   auto* is = input_system();
+   const u32 result = is->GetState(actual_user_index, input_state);
+   if (result == X_ERROR_SUCCESS) {
++    ApplyPadScript(input_state);
+     ApplySyntheticInput(input_state);
+   }
+   return result;
 diff --git a/src/ui/imgui_drawer.cpp b/src/ui/imgui_drawer.cpp
 index 50a26d0..708feff 100644
 --- a/src/ui/imgui_drawer.cpp
