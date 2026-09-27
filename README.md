@@ -1,4 +1,4 @@
-> **Note:** this fork is vibe coded AI slop made for fun.
+> **Note:** this fork is vibe coded AI slop made for fun, alot of features are half tested!.
 
 <p align="center">
   <img src="docs/images/skating-crab.png" alt="Rust crab riding a skateboard" width="480">
