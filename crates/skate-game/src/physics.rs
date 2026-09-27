@@ -263,7 +263,7 @@ impl GamePhysics {
         terrain: ground::Terrain,
         map: Option<&skate_data::skate_map::SkateMap>,
     ) -> Result<Self, String> {
-        Self::load_world_difficulty(asset_root, terrain, map, crate::difficulty::Difficulty::Easy)
+        Self::load_world_difficulty(asset_root, terrain, map, crate::difficulty::Difficulty::Easy, None)
     }
 
     pub fn load_with_map(asset_root: &std::path::Path, map: Option<&skate_data::skate_map::SkateMap>) -> Result<Self, String> {
@@ -271,10 +271,17 @@ impl GamePhysics {
     }
 
     pub fn load_with_difficulty(asset_root: &std::path::Path, map: Option<&skate_data::skate_map::SkateMap>, difficulty: crate::difficulty::Difficulty) -> Result<Self, String> {
-        Self::load_world_difficulty(asset_root, ground::Terrain::Course, map, difficulty)
+        Self::load_world_difficulty(asset_root, ground::Terrain::Course, map, difficulty, None)
     }
 
-    fn load_world_difficulty(asset_root: &std::path::Path, terrain: ground::Terrain, map: Option<&skate_data::skate_map::SkateMap>, difficulty: crate::difficulty::Difficulty) -> Result<Self, String> {
+    /// Test course (rails, ramps) with the board spawned at `spawn` (wheel-ground anchor)
+    /// facing `heading` (radians about +Y, 0 = +Z). Scripted tests only (SK-062).
+    #[cfg(test)]
+    pub fn load_course_at(asset_root: &std::path::Path, difficulty: crate::difficulty::Difficulty, spawn: [f32; 3], heading: f32) -> Result<Self, String> {
+        Self::load_world_difficulty(asset_root, ground::Terrain::Course, None, difficulty, Some((spawn, heading)))
+    }
+
+    fn load_world_difficulty(asset_root: &std::path::Path, terrain: ground::Terrain, map: Option<&skate_data::skate_map::SkateMap>, difficulty: crate::difficulty::Difficulty, spawn_at: Option<([f32; 3], f32)>) -> Result<Self, String> {
         let data = Collections::load(asset_root)?;
         let settings = PhysicsSettings::load(&data)?;
         let base_gravity = settings.step.simulation.gravity_acceleration;
@@ -291,15 +298,15 @@ impl GamePhysics {
             ),
             ..RetailAffineTransform::IDENTITY
         };
-        if let Some(map) = map {
+        if let Some((at, heading)) = map.map(|m| (m.spawn, m.heading)).or(spawn_at) {
             // Package spawn is the wheel-ground anchor, in native Y-up metres.
             spawn.translation = Vector3::new(
-                map.spawn[0],
-                map.spawn[1] + settings.wheel_radius - settings.authored[0].translation.y,
-                map.spawn[2],
+                at[0],
+                at[1] + settings.wheel_radius - settings.authored[0].translation.y,
+                at[2],
             );
             spawn.basis = skate_core::math::Basis3 {
-                columns: Mat3::from_rotation_y(map.heading).to_cols_array_2d(),
+                columns: Mat3::from_rotation_y(heading).to_cols_array_2d(),
             };
         }
         let board = BoardRuntime::new(
@@ -624,6 +631,9 @@ mod offboard_recall_playback_tests;
 #[cfg(test)]
 #[path = "tests/scripted_play.rs"]
 pub(crate) mod scripted_play;
+#[cfg(test)]
+#[path = "tests/grind_snap.rs"]
+mod grind_snap_tests;
 #[cfg(test)]
 #[path = "tests/offboard_jump_playback.rs"]
 mod offboard_jump_playback_tests;

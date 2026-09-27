@@ -32,6 +32,16 @@ Add to it whenever a test teaches something new.
 - **Map-specific bugs**: the flat test world is small; the skater runs off it within seconds.
   Load the real map with `SkateMap::load` and set `map.spawn` / `map.heading` to where the bug
   happened (SK-025). `SkateMap` is not `Clone`: mutate it in place between runs.
+- **Test course at any spot** (SK-062): `GamePhysics::load_course_at(root, Difficulty::Normal, spawn, heading)`
+  gives the default world (rails, ramps, halfpipe) with the board at `spawn` (wheel-ground anchor),
+  heading about +Y with 0 = +Z. `GamePhysics::load` is the *flat* world with no rails. Set a riding
+  speed after ~40 settle ticks with `impulse::queue` (SK-005). Deck frame for probes:
+  `solve::deck_frame(&physics.board)` = [right, up, forward, position].
+- **Ollie timing**: the SK-031 flick (right stick down 8 ticks, up 6) pops ~14 ticks after the
+  flick; the deck apex is ~0.62 m and it lands ~45 ticks after the flick at 3-7 m/s. Calibrate the
+  flick distance with one ollie on open floor instead of guessing (`grind_snap.rs` `calibrate`).
+- **Why a gate rejects**: temporary `eprintln!` at each `return None` of the native gate, run the
+  quick subset, then remove them; the sweep plus prints took ~2 min (SK-062 found the 11 deg angle gate).
 - **Blow-ups (NaN/inf)**: assert on the first lane that grows, not only on "finite", to find the
   feedback loop early (SK-025: the support velocity `w` lane).
 
