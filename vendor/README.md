@@ -20,6 +20,9 @@ levels and conservative source sampling prevent false occlusion at arbitrary
 viewport sizes, including scaled targets and MSAA. The associated meshlet
 texture-dimension fix is included in `bevy_pbr/src/meshlet/meshlet_cull_shared.wgsl`.
 The game uses ordinary meshes, not meshlets.
+`downsample_depth` also returns early when the pyramid has fewer than 7 mips
+(a view under 64 px, e.g. a minimised window): the dummy texture then fills mip 6,
+which both passes use, and wgpu panics on the conflicting usages (SK-037).
 
 The late mesh preprocessing pass in 0.18.1 also binds its indirect dispatch
 buffer as writable storage, which fails wgpu validation when occlusion is on.

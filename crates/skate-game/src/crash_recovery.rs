@@ -117,6 +117,15 @@ fn write_report(report: &str) -> Option<PathBuf> {
 
 /// Exclusive: rebuild the world through the map transition once a failure is reported.
 fn recover(world: &mut World) {
+    if world.resource::<CrashRecovery>().failure.is_none() {
+        return;
+    }
+    // Rebuilding the world while minimised (0x0 surface) panics in the renderer's depth
+    // pyramid (SK-037); wait until the window is visible again.
+    let mut windows = world.query_filtered::<&Window, With<bevy::window::PrimaryWindow>>();
+    if windows.iter(world).any(|w| w.width() <= 0. || w.height() <= 0.) {
+        return;
+    }
     let Some(report) = world.resource_mut::<CrashRecovery>().failure.take() else { return };
     let now = world.resource::<Time<Real>>().elapsed_secs_f64();
     let saved = write_report(&report);

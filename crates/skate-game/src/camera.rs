@@ -59,7 +59,11 @@ pub(crate) fn present(vehicles: Res<crate::modding::vehicles::Vehicles>, mut run
     customiser: Option<Res<crate::customiser::Customiser>>,
     mut cameras: Query<(&mut Camera, &mut Transform, &mut Projection), With<GameplayCamera>>) {
     if let Ok(window) = windows.single() {
-        runtime.set_aspect_ratio(window.width() / window.height());
+        // A minimised window reports 0x0; 0/0 made the camera FOV NaN and failed the physics (SK-037).
+        let aspect = window.width() / window.height();
+        if aspect.is_finite() && aspect > 0. {
+            runtime.set_aspect_ratio(aspect);
+        }
     }
     let Some((previous, current, alpha)) = history.view(&replay, time.overstep_fraction()) else { return; };
     for (mut camera, mut transform, mut projection) in &mut cameras {

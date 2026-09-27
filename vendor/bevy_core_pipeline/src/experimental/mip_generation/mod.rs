@@ -687,6 +687,12 @@ impl ViewDepthPyramid {
         downsample_depth_first_pipeline: &ComputePipeline,
         downsample_depth_second_pipeline: &ComputePipeline,
     ) {
+        // Skate 3 Rust Engine patch (SK-037): below 64 px (minimised window) the pyramid has
+        // fewer than 7 mips and the dummy texture fills mip 6, which the first pass writes and
+        // the second pass reads, a wgpu usage conflict that panics. Nothing is visible then.
+        if self.mip_count < 7 {
+            return;
+        }
         // We need to make sure that every mip level the single-pass
         // downsampling (SPD) shader sees has lengths that are powers of two for
         // correct conservative depth buffer downsampling. To do this, we

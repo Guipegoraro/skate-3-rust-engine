@@ -43,16 +43,50 @@ Add to it whenever a test teaches something new.
   overlay says 36 km/h. `examples_load_and_run` must list every example id.
 - Package a mod for the game with `python tools/package_mod.py sdk/examples/<mod> mods/<mod>.zip`.
 
-## Live game (BRP)
+## Live game tests (`scripts/GameTest.psm1`)
 
-- The game serves Bevy Remote Protocol on port 15703 (`.local/play.cmd`). Only `Reflect`
-  types are visible; `GamePhysics` is not, so physics checks belong in the scripted harness.
-- Screenshots via BRP are the check for HUD/menu changes.
-- Two instances (SK-002): `.local/play-2p.cmd` gives BRP 15703 (player 1) and 15704 (player 2); screenshot each port. Window rectangles can be read with Win32 `GetWindowRect` after `SetProcessDPIAware` (physical pixels). Launch detached (`Start-Process`) or the tool call waits on the games' output pipes.
-- Crash recovery (SK-033): launch with `SKATE_FORCE_PHYSICS_FAILURE=30` and grep the game log for `CRASH_RECOVERY` (failure, then `restored to`). Launch through `scripts/Launch.ps1` (not `bin/skate3rust.exe` directly) or there is no `logs/game-*.log` and no BRP. Panics land in `logs/game-*.stderr.log` as `REPORT_PANIC <message>`.
-- BRP port clash: if `brp_extras/screenshot` says the method is not found, another Bevy app (e.g. iw4L) owns the port; check the owner with `Get-NetTCPConnection -State Listen` and relaunch with another `BRP_EXTRAS_PORT` (15705).
-- Mod features: enable a mod for a test by writing `data/installations/<id>/settings/mods/<mod id>.json` (`{"enabled":true,"values":{...}}`) before launch; set it back afterwards.
-- The first BRP connection right after launch can fail while the port is not yet listening; wait for `netstat` to show it LISTENING.
+Use this module for anything that needs the running game; it replaces hand-written launch,
+sleep and screenshot snippets. Default map is the **test world** (`--test-world`), which
+loads in seconds; pass `-Map` only when the map matters.
+
+```powershell
+Import-Module .\scripts\GameTest.psm1 -Force
+$g = Start-TestGame -Stage -Mods @{'guipegoraro.skater-size' = @{size = 2}} -Model stock `
+     -Env @{SKATE_FORCE_PHYSICS_FAILURE = '25'}
+Save-GameScreenshot $g 'size-2'      # logs/test-shots/size-2.png, then Read it
+Send-GameKeys $g @('KeyW') 1000      # keyboard input through BRP
+Set-GameWindow $g Minimize           # throws if Windows did not minimise it
+Get-GameIssues $g                    # non-finite / CRASH_RECOVERY / REPORT_PANIC / ERROR lines
+Test-GameAlive $g
+Stop-TestGame $g                     # closes the game, restores mod and model settings
+```
+
+- `Start-TestGame` kills any running game, optionally stages `target/` into `bin/` (`-Stage`),
+  backs up every settings file it touches (mod settings, custom model selection) and
+  picks a free BRP port from 15705 up (iw4L often owns 15702/15703). It waits for BRP to
+  answer, then 8 s for the world to settle. Logs: `logs/test-<time>.log`/`.stderr.log`.
+- Scenario scripts wrap it and exit 1 on failure, so they work as regression checks:
+  `scripts/Test-Minimize.ps1` (minimise must not fail the camera or panic, SK-037) and
+  `scripts/Test-MinimizedRecovery.ps1` (a physics failure while minimised recovers after restore).
+  Add one per live bug; first run it on the old exe and see it go red.
+- The exe is a crash-report supervisor plus a child. Both own "visible" helper windows (the
+  supervisor's `PseudoConsoleWindow`, winit's `Winit Thread Event Target`), so the game window is
+  found by its title "Skate 3 Rust Engine" (`EnumWindows`). Minimising a helper instead looked
+  exactly like a Bevy bug (window restored at 0x0): check sizes with `Get-GameWindowSize`
+  (Windows client area vs Bevy resolution) before blaming the engine.
+- `Start-TestGame` takes a lock (`logs/game-test.lock`), so parallel sessions/agents wait for each
+  other instead of killing each other's game; `-Stage` throws if `bin/` is in use. Always
+  `Stop-TestGame` in a `finally`.
+- Screenshot size is a cheap sanity check: a 1x1 PNG means the game rendered into an empty window.
+- Only `Reflect` types are visible through BRP; `GamePhysics` is not, so physics checks belong
+  in the scripted harness.
+- Two instances (SK-002): `.local/play-2p.cmd` gives BRP 15703 (player 1) and 15704 (player 2).
+  Window rectangles: Win32 `GetWindowRect` after `SetProcessDPIAware` (physical pixels).
+- Crash recovery (SK-033): `-Env @{SKATE_FORCE_PHYSICS_FAILURE='30'}` and look for
+  `CRASH_RECOVERY ... restored to` in `Get-GameIssues`. Panics are `REPORT_PANIC <message>`.
+- Custom models: import without the picker with `python tools/setup.py --character-import
+  --library-import <library> --reference assets/private/skater.glb --result r.json
+  --noninteractive <model.glb>`, then `Start-TestGame -Model <id>`.
 - Finding entities by name (SK-034): BRP `world.query` with `bevy_ecs::name::Name` and
   `Transform`, filtered on the name in PowerShell; `scripts/Test-Pedestrians.ps1` reads NPC
   roots twice 3 s apart to check they walk.
