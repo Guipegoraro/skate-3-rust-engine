@@ -78,3 +78,6 @@ __pycache__/
 /PLAY-NATIVE-TRAINER.bat
 /PLAY-SCROLL-SETTINGS.bat
 /PLAY-SHOWCASE.bat
+
+# Board: local working memory, the same on every branch
+/tasks/
