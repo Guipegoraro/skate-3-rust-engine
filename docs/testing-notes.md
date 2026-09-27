@@ -77,6 +77,8 @@ Stop-TestGame $g                     # closes the game, restores mod and model s
 - `Start-TestGame` takes a lock (`logs/game-test.lock`), so parallel sessions/agents wait for each
   other instead of killing each other's game; `-Stage` throws if `bin/` is in use. Always
   `Stop-TestGame` in a `finally`.
+- `Start-TestGame` also stops `skate-steam-relay`, which can outlive the game and hold `bin/steam-relay` files so staging fails. The module runs on Windows PowerShell 5 too (no `utf8NoBOM` there; `Write-Utf8` writes BOM-less UTF-8).
+- `scripts/Test-SkaterSize.ps1`: screenshots per mod setting; the pattern for any visual option (one Start/Stop per value).
 - Screenshot size is a cheap sanity check: a 1x1 PNG means the game rendered into an empty window.
 - Only `Reflect` types are visible through BRP; `GamePhysics` is not, so physics checks belong
   in the scripted harness.

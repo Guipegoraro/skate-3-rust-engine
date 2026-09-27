@@ -42,6 +42,9 @@ public static class GameTestWin {
 
 function Get-Installation { (Get-ChildItem (Join-Path $Root 'data\installations') -Directory | Select-Object -First 1).FullName }
 
+# UTF-8 without BOM on both Windows PowerShell 5 and PowerShell 7 (5 has no utf8NoBOM).
+function Write-Utf8([string]$path) { [IO.File]::WriteAllText($path, ($input | Out-String)) }
+
 function Backup-File($game, [string]$path) {
     if ($game.Backups.ContainsKey($path)) { return }
     $game.Backups[$path] = if (Test-Path $path) { [IO.File]::ReadAllText($path) } else { $null }
@@ -89,14 +92,15 @@ function Start-TestGame {
     # Waits for any other session's test to finish instead of killing its game.
     Enter-TestLock $Owner $LockTimeoutSeconds
     try {
-        Get-Process skate3rust -ErrorAction SilentlyContinue | Stop-Process -Force
+        # The game may leave its Steam relay running; it holds bin/steam-relay files.
+        Get-Process skate3rust, skate-steam-relay -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep 2
         if ($Stage) {
             # Staging fails when another session's game still holds bin/ DLLs; never test a stale exe.
             for ($try = 1; $try -le 5; $try++) {
-                & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'scripts\Build.ps1') -StageOnly *> $null
+                $output = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'scripts\Build.ps1') -StageOnly 2>&1
                 if ($LASTEXITCODE -eq 0) { break }
-                if ($try -eq 5) { throw 'Staging into bin/ failed (files in use by another game?)' }
+                if ($try -eq 5) { throw "Staging into bin/ failed: $(($output | Select-Object -Last 3) -join ' | ')" }
                 Start-Sleep 10
             }
         }
@@ -106,13 +110,13 @@ function Start-TestGame {
         foreach ($id in $Mods.Keys) {
             $file = Join-Path $settings "$id.json"
             Backup-File $game $file
-            @{ enabled = $true; values = $Mods[$id] } | ConvertTo-Json -Depth 5 | Set-Content $file -Encoding utf8NoBOM
+            @{ enabled = $true; values = $Mods[$id] } | ConvertTo-Json -Depth 5 | Write-Utf8 $file
         }
         if ($Model) {
             $file = Join-Path $Library 'selection.json'
             Backup-File $game $file
             $selected = if ($Model -eq 'stock') { $null } else { $Model }
-            @{ version = 1; selected = $selected } | ConvertTo-Json | Set-Content $file -Encoding utf8NoBOM
+            @{ version = 1; selected = $selected } | ConvertTo-Json | Write-Utf8 $file
         }
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
         $game.Log = Join-Path $Root "logs\test-$stamp.log"
@@ -205,7 +209,7 @@ function Stop-TestGame($game) {
 function Stop-TestGameCore($game) {
     if (-not $game) { return }
     if (-not $game.Process.HasExited) { Stop-Process -Id $game.Process.Id -Force }
-    Get-Process skate3rust -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process skate3rust, skate-steam-relay -ErrorAction SilentlyContinue | Stop-Process -Force
     foreach ($path in $game.Backups.Keys) {
         $text = $game.Backups[$path]
         if ($null -eq $text) { Remove-Item $path -ErrorAction SilentlyContinue } else { [IO.File]::WriteAllText($path, $text) }

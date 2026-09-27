@@ -56,7 +56,7 @@ pub(crate) fn present(vehicles: Res<crate::modding::vehicles::Vehicles>, mut run
     history: Res<crate::presentation::Presentation>, time: Res<Time<Fixed>>,
     (replay, fly): (Res<crate::replay::Replay>, Res<crate::fly_mode::FlyMode>),
     virtual_time: Res<Time<Virtual>>, mut vehicle_blend: Local<VehicleCameraBlend>,
-    customiser: Option<Res<crate::customiser::Customiser>>,
+    (customiser, skater_scale): (Option<Res<crate::customiser::Customiser>>, Res<crate::physics::SkaterScale>),
     mut cameras: Query<(&mut Camera, &mut Transform, &mut Projection), With<GameplayCamera>>) {
     if let Ok(window) = windows.single() {
         // A minimised window reports 0x0; 0/0 made the camera FOV NaN and failed the physics (SK-037).
@@ -68,6 +68,11 @@ pub(crate) fn present(vehicles: Res<crate::modding::vehicles::Vehicles>, mut run
     let Some((previous, current, alpha)) = history.view(&replay, time.overstep_fraction()) else { return; };
     for (mut camera, mut transform, mut projection) in &mut cameras {
         *transform = crate::presentation::blend(previous.camera, current.camera, alpha);
+        // A resized skater (SK-038/039) keeps the stock framing: scale the offset from the root.
+        if skater_scale.0 != 1. {
+            let root = crate::presentation::blend(previous.root, current.root, alpha).translation;
+            transform.translation = root + (transform.translation - root) * skater_scale.0;
+        }
         if replay.active {
             if let Some(free) = replay.free_camera { *transform = free; }
         }
