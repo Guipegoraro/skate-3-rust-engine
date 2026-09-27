@@ -10,7 +10,7 @@ Every code change belongs to a card, and every card moves through the same steps
 | In `doing`, seams agreed | `/implement`: `/tdd` at those seams (`cargo test` crates, or a GameTest scenario for in-game behaviour), `cargo check` per iteration. |
 | Code done, uncommitted | `node scripts/clippy-touched.js` and the crate tests green, then `/code-review` since the card's first commit: Standards axis = `CLAUDE.md` code rules, Spec axis = the card's acceptance criteria. Fix findings, add the README bullet, commit naming the card. |
 | Verified by build/tests/screenshots | Move to `finished`; leftover scope becomes a new card. `testing` only for feel or controller behaviour the user must try. |
-| Waiting on the user | Move to `voce` with a `> @claude … PARA VOCE:` note listing exactly what to try or decide. |
+| Waiting on the user | Move to `voce` (renamed `your-move` by SK-073) with a `> @claude … FOR YOU:` note listing exactly what to try or decide. |
 | Bug reported (chat, card note, log) | `/diagnosing-bugs`: first a loop that goes red on the bug (a test or GameTest scenario), then the fix, then the regression test stays. |
 | Upstream merge stops on conflicts | `/resolving-merge-conflicts`. |
 | Session ending mid-card | `/handoff` into the card's `## Progress`. |

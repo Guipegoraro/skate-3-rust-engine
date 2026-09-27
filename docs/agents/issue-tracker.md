@@ -27,4 +27,4 @@ Every card has these sections, in this order:
 | resolved | column `finished` (only after build, tests or screenshots verified it); `testing` only when the user must try it in game |
 | comments | a `> @user` or `> @claude` line under `## Notes` |
 
-Leftover scope never keeps a card open: split it into a new card. Every commit names the card id (`SK-nnn`) it belongs to, and the README bullet for the feature names it too.
+Leftover scope never keeps a card open: split it into a new card. Commits name the card id (`SK-nnn`) they belong to, and the README bullet for the feature names it too.
