@@ -20,11 +20,19 @@ pub(crate) struct Snapshot {
     pub fov: f32,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub(crate) struct Presentation {
     pair: Option<(Snapshot, Snapshot)>,
     generation: u64,
     period: std::time::Duration,
+    /// Blend the last two ticks (one tick behind, smooth). Off shows the newest tick as
+    /// soon as it exists (SK-060); set every frame from the menu by `video_effects::sync`.
+    pub smoothing: bool,
+}
+impl Default for Presentation {
+    fn default() -> Self {
+        Self { pair: None, generation: 0, period: default(), smoothing: true }
+    }
 }
 impl Presentation {
     pub fn view<'a>(&'a self, replay: &'a crate::replay::Replay, alpha: f32)
@@ -32,15 +40,24 @@ impl Presentation {
         if replay.active {
             replay.sample()
         } else {
-            self.pair().map(|(a, b)| (a, b, alpha.clamp(0.0, 1.0)))
+            self.pair().map(|(a, b)| (a, b, self.alpha(alpha)))
         }
+    }
+    /// Blend weight of the newest tick for this frame: the fixed-clock overstep, or 1
+    /// (newest tick only) with smoothing off.
+    pub fn alpha(&self, overstep: f32) -> f32 {
+        if self.smoothing { overstep.clamp(0.0, 1.0) } else { 1.0 }
+    }
+    /// Counts captured ticks; changes whenever a new snapshot becomes the newest.
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
     pub fn pair(&self) -> Option<(&Snapshot, &Snapshot)> {
         self.pair.as_ref().map(|(a, b)| (a, b))
     }
 }
 
-fn capture(skater: Res<SkaterRuntime>, camera: Res<CameraRuntime>,
+pub(crate) fn capture(skater: Res<SkaterRuntime>, camera: Res<CameraRuntime>,
     time: Res<Time<Fixed>>, mut history: ResMut<Presentation>,
     mut replay: ResMut<crate::replay::Replay>) {
     if skater.pose_generation == history.generation { return; }
@@ -80,6 +97,20 @@ fn camera_transform(frame: CameraFrame) -> Transform {
         // Native At is forward; Bevy cameras look along local -Z.
         rotation: Quat::from_mat3(&Mat3::from_cols(-right, up, -at)).normalize(),
         ..default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn smoothing_off_shows_the_newest_tick() {
+        let mut presentation = Presentation::default();
+        assert!(presentation.smoothing);
+        assert_eq!(presentation.alpha(0.25), 0.25);
+        assert_eq!(presentation.alpha(1.5), 1.0);
+        presentation.smoothing = false;
+        assert_eq!(presentation.alpha(0.25), 1.0);
     }
 }
 

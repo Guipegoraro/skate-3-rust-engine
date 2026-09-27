@@ -122,6 +122,7 @@ pub(crate) fn build(
     app.add_plugins((crate::session_marker::SessionMarkerPlugin, crate::customiser::CustomiserPlugin));
     app.add_plugins(crate::custom_models::CustomModelsPlugin);
     app.add_plugins(crate::crash_recovery::CrashRecoveryPlugin);
+    app.add_plugins(crate::latency_probe::LatencyProbePlugin);
     app.add_plugins(crate::modding::ModdingPlugin);
     #[cfg(feature = "brp")]
     app.add_plugins(bevy_brp_extras::BrpExtrasPlugin);

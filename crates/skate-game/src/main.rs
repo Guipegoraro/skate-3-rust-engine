@@ -55,6 +55,7 @@ mod retail_render;
 mod retail_character;
 mod retail_irradiance;
 mod presentation;
+mod latency_probe;
 mod replay;
 mod world;
 mod grind_world;

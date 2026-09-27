@@ -1,6 +1,6 @@
 //! Optional video effects beyond the original game (SK-051), shown in the pause menu's
 //! "Video effects" page and saved inside settings/graphics.json. All default Off, so the
-//! stock look stays the default. To add an effect: a field in `VideoEffects`, one `ROWS`
+//! stock look stays the default (the Smoothing row shows "On" for `latest_tick: false`). To add an effect: a field in `VideoEffects`, one `ROWS`
 //! entry, its clamp in `validated`, its name in `apply_overrides` and its camera
 //! components in `sync`.
 use crate::option_rows::{count_step, level_name, on_off, OptionRow};
@@ -26,6 +26,9 @@ pub(crate) struct VideoEffects {
     pub ssr: bool,
     /// Sun rays (volumetric light), 0 Off, 1 Low, 2 Medium, 3 High (SK-055).
     pub volumetric: u32,
+    /// Smoothing Off (SK-060): draw the newest physics tick instead of blending the last
+    /// two, which trails one tick (~16.7 ms) behind. Stored inverted so the default is On.
+    pub latest_tick: bool,
 }
 
 const LEVELS: &[&str] = &["Off", "Low", "Medium", "High", "Ultra"];
@@ -51,6 +54,11 @@ pub(crate) const ROWS: &[OptionRow<VideoEffects>] = &[
         value: |e| level_name(e.volumetric, &LEVELS[..4]),
         change: |e, step| e.volumetric = count_step(e.volumetric, step, 3),
     },
+    OptionRow {
+        label: "Smoothing",
+        value: |e| if e.latest_tick { "Off (newest tick)".into() } else { "On".into() },
+        change: |e, _| e.latest_tick = !e.latest_tick,
+    },
 ];
 
 impl VideoEffects {
@@ -70,6 +78,7 @@ impl VideoEffects {
                 "ssao" => self.ssao = value,
                 "ssr" => self.ssr = value != 0,
                 "volumetric" => self.volumetric = value,
+                "smoothing" => self.latest_tick = value == 0,
                 _ => warn!("SKATE_VIDEO_FX: unknown effect {name}"),
             }
         }
@@ -142,7 +151,7 @@ pub(crate) fn sync(
     menu: Option<Res<crate::graphics_menu::Menu>>,
     frame: Option<ResMut<crate::retail_render::ShadowState>>,
     retail_materials: Option<ResMut<Assets<crate::retail_render::RetailWorldMaterial>>>,
-    mut ssr_applied: Local<Option<(bool, usize)>>,
+    (mut ssr_applied, presentation): (Local<Option<(bool, usize)>>, Option<ResMut<crate::presentation::Presentation>>),
     (mut lights, mut volumes): (
         Query<(Entity, &mut DirectionalLight, Has<VolumetricLight>, Has<SunRaysBorrowedLight>, Option<&RenderLayers>)>,
         Query<(Entity, &mut FogVolume, &mut Transform), With<SunRaysVolume>>,
@@ -154,6 +163,10 @@ pub(crate) fn sync(
 ) {
     let Some(menu) = menu else { return };
     let (effects, samples, occlusion) = menu.video_effects();
+    // Also restores the choice after a map switch resets Presentation.
+    if let Some(mut presentation) = presentation {
+        if presentation.smoothing == effects.latest_tick { presentation.smoothing = !effects.latest_tick; }
+    }
     if let Some(mut frame) = frame {
         // Retail SSAO strength and debug view, read by retail_world.wgsl (clock.z/w).
         let wanted = Vec2::new(ssao_strength(), if ssao_debug() { 1. } else { 0. });
@@ -280,11 +293,27 @@ mod tests {
         assert_eq!(effects, VideoEffects { bloom: 2, ..default() });
         let mut effects = VideoEffects::default();
         effects.apply_overrides("bloom=9, nothing=1, bloom2=x, ssao=7");
-        assert_eq!(effects, VideoEffects { bloom: 3, ssao: 4, ssr: false, volumetric: 0 });
+        assert_eq!(effects, VideoEffects { bloom: 3, ssao: 4, ssr: false, volumetric: 0, latest_tick: false });
         effects.apply_overrides("ssr=1");
         assert!(effects.ssr);
         assert_eq!((ROWS[0].value)(&VideoEffects::default()), "Off");
         assert_eq!((ROWS[1].value)(&VideoEffects { ssao: 2, ..default() }), "Medium (MSAA off)");
+    }
+    #[test]
+    fn smoothing_row_and_override_reach_the_presentation() {
+        assert_eq!((ROWS[4].value)(&VideoEffects::default()), "On");
+        let mut effects = VideoEffects::default();
+        (ROWS[4].change)(&mut effects, 1);
+        assert!(effects.latest_tick);
+        effects.apply_overrides("smoothing=1");
+        assert!(!effects.latest_tick);
+        effects.apply_overrides("smoothing=0");
+        let (mut app, _) = app(effects);
+        app.init_resource::<crate::presentation::Presentation>();
+        app.update();
+        assert!(!app.world().resource::<crate::presentation::Presentation>().smoothing);
+        set(&mut app, VideoEffects::default());
+        assert!(app.world().resource::<crate::presentation::Presentation>().smoothing);
     }
     #[test]
     fn bloom_adds_and_removes_with_hdr_on_procedural_worlds() {

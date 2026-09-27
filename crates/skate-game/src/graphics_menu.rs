@@ -31,7 +31,8 @@ const RESOLUTIONS: &[(u32, u32)] = &[
 // Above 100% the scene renders larger and is filtered down to the window (supersampling).
 const SCALES: &[u32] = &[25, 50, 67, 75, 85, 100, 125, 150, 200];
 const DAY_SPEEDS: &[u32] = &[0, 1, 10, 30, 60, 120, 360, 720];
-const LIMITS: &[u32] = &[0, 30, 60, 90, 120, 144, 165, 240];
+// 30/60/120/180/240 give every frame the same number of 60 Hz physics ticks (SK-060).
+const LIMITS: &[u32] = &[0, 30, 60, 90, 120, 144, 165, 180, 240];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -139,6 +140,10 @@ impl Menu {
     #[cfg(test)]
     pub(crate) fn set_video_effects(&mut self, effects: crate::video_effects::VideoEffects) {
         self.settings.effects = effects;
+    }
+    /// For the SK-060 latency probe log.
+    pub(crate) fn fps_limit_text(&self) -> String {
+        format!("fps limit {}", fps_label(self.settings.fps))
     }
     pub(crate) fn diagnostic_settings(&self) -> String {
         format!("{:?}", self.settings)
@@ -735,14 +740,7 @@ fn labels(
                         format!("{}x", s.samples)
                     }
                 ),
-                3 => format!(
-                    "FPS limit             {}",
-                    if s.fps == 0 {
-                        "Unlimited".into()
-                    } else {
-                        s.fps.to_string()
-                    }
-                ),
+                3 => format!("FPS limit             {}", fps_label(s.fps)),
                 4 => format!(
                     "Occlusion culling     {}",
                     if s.occlusion { "On" } else { "Off" }
@@ -795,6 +793,14 @@ fn labels(
         };
     }
 }
+/// FPS limit text; limits that do not divide evenly into the 60 Hz physics say so (SK-060).
+fn fps_label(fps: u32) -> String {
+    match fps {
+        0 => "Unlimited".into(),
+        fps if fps % 60 == 0 || 60 % fps == 0 => fps.to_string(),
+        fps => format!("{fps}  (uneven vs 60 Hz physics)"),
+    }
+}
 fn pace(menu: Option<Res<Menu>>, mut pacer: ResMut<FramePacer>) {
     let Some(menu) = menu else {
         return;
@@ -821,6 +827,12 @@ mod tests {
             TextureFormat::Rgba8UnormSrgb,
             None,
         ));
+        app.insert_resource(crate::config::Config {
+            asset_root: "unused".into(), verification_capture: None,
+            map: None, map_path: None, difficulty: Difficulty::Easy,
+            check_assets: false, start_paused: false, teleport: None, window: None, borderless: false,
+            multiplayer: Default::default(), map_fingerprint: 0,
+        });
         app.insert_resource(SceneTarget(target.clone()))
             .insert_resource(images)
             .insert_resource(Menu {
@@ -888,6 +900,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(settings.effects, crate::video_effects::VideoEffects::default());
+        assert!(!settings.effects.latest_tick, "old files keep smoothing On (SK-060)");
         assert_eq!(settings.scale, 200);
         let saved = serde_json::to_string(&GraphicsSettings::default()).unwrap();
         assert!(saved.contains("\"effects\""));
@@ -908,5 +921,12 @@ mod tests {
         assert_eq!(supersampled.validated().internal_size(UVec2::new(1280, 800)), UVec2::new(2560, 1600));
         assert_eq!(cycle(LIMITS, 0, -1), 240);
         assert_eq!(cycle(LIMITS, 240, 1), 0);
+        // Saved limits from before SK-060 stay valid.
+        for fps in [0, 30, 60, 90, 120, 144, 165, 240] {
+            assert_eq!(GraphicsSettings { fps, ..default() }.validated().fps, fps);
+        }
+        assert_eq!(fps_label(120), "120");
+        assert_eq!(fps_label(30), "30");
+        assert_eq!(fps_label(90), "90  (uneven vs 60 Hz physics)");
     }
 }

@@ -556,7 +556,9 @@ fn tick(world: &mut World) {
 }
 pub(crate) fn present(world: &mut World) {
     let dt=world.resource::<Time<Virtual>>().delta_secs();
-    let alpha=world.resource::<Time<Fixed>>().overstep_fraction();
+    let overstep=world.resource::<Time<Fixed>>().overstep_fraction();
+    // Same blend as the skater and camera, so smoothing Off (SK-060) shows the newest tick here too.
+    let alpha=world.get_resource::<crate::presentation::Presentation>().map_or(overstep,|p|p.alpha(overstep));
     let phase=world.resource::<Vehicles>().driver.as_ref().map_or("vanilla",|d|d.phase).to_owned();
     let current=crate::animation::capture_vehicle_visual(world);
     {

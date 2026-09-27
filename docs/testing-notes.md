@@ -106,6 +106,11 @@ Stop-TestGame $g                     # closes the game, restores mod and model s
   roots twice 3 s apart to check they walk.
 - Animation checks from screenshots: take 3-4 shots ~0.3 s apart and crop/upscale the character
   with .NET `System.Drawing` (the global Python has no Pillow); legs must change pose.
+- Input latency (SK-060): `-Env @{SKATE_LATENCY_PROBE='1'}` logs `latency probe: buttons ...
+  polled frame -> physics tick -> first drawn frame -> fully drawn frame` per button press
+  (grep the log). `SKATE_VIDEO_FX=smoothing=0` and `SKATE_FPS_LIMIT=60|90|120` give A/B runs
+  without touching graphics.json. Screen time is ~1 frame after "fully drawn" (pipelined
+  render), not in the log.
 - FPS A/B: `SKATE_PERF_REPORT=<file.json>` makes the game record 10-25 s after start, write the
   report and exit. Test world: ~88 FPS, 11.4 ms median on this machine (SK-034, 0 vs 10 NPCs).
 
