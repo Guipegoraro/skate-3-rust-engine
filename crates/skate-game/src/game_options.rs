@@ -28,7 +28,7 @@ impl Default for GameOptions {
             master_volume: 80,
             music_volume: 70,
             effects_volume: 100,
-            pedestrians: 4,
+            pedestrians: 0,
             path: PathBuf::new(),
         }
     }
