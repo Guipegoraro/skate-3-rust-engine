@@ -2,6 +2,8 @@ mod audio;
 mod fps_overlay;
 mod fly_mode;
 mod game_options;
+mod option_rows;
+mod video_effects;
 mod hud_shapes;
 mod stick_hud;
 mod ui_textures;

@@ -1,5 +1,6 @@
 //! Player-facing game options shown in the pause menu's "Game options" page.
 //! To add an option: add a field to `GameOptions` and one entry to `ROWS`.
+use crate::option_rows::{count_step, on_off, OptionRow};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -33,14 +34,7 @@ impl Default for GameOptions {
     }
 }
 
-/// One menu row: its label, how to show the current value, and how Left/Right/Enter change it.
-pub(crate) struct OptionRow {
-    pub label: &'static str,
-    pub value: fn(&GameOptions) -> String,
-    pub change: fn(&mut GameOptions, i32),
-}
-
-pub(crate) const ROWS: &[OptionRow] = &[
+pub(crate) const ROWS: &[OptionRow<GameOptions>] = &[
     OptionRow {
         label: "Right-stick indicator",
         value: |o| on_off(o.stick_indicator),
@@ -75,10 +69,6 @@ pub(crate) const ROWS: &[OptionRow] = &[
 
 pub(crate) const MAX_PEDESTRIANS: u32 = 12;
 
-fn on_off(value: bool) -> String {
-    if value { "On" } else { "Off" }.into()
-}
-
 fn percent(value: u32) -> String {
     format!("{value}%")
 }
@@ -89,14 +79,6 @@ fn volume_step(value: u32, step: i32) -> u32 {
         return 0;
     }
     (value as i32 + step.signum() * 10).clamp(0, 100) as u32
-}
-
-/// Left/Right step by 1. Right/Enter past `max` wraps to 0.
-fn count_step(value: u32, step: i32, max: u32) -> u32 {
-    if step > 0 && value >= max {
-        return 0;
-    }
-    (value as i32 + step.signum()).clamp(0, max as i32) as u32
 }
 
 impl GameOptions {

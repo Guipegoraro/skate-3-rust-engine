@@ -93,6 +93,7 @@ Modifications on top of upstream (branch `dev/brp`). The feature board lives in
 **Graphics**
 - 16x anisotropic filtering on world textures.
 - Render scale up to 200% (supersampling), since MSAA stops at 8x.
+- **Video effects** page in the pause menu (SK-051): optional extras the original game did not have, each Off by default and saved in `settings/graphics.json` (`effects`; older files load with everything Off), applied live to the gameplay camera. Its rows use the shared option-page layer `option_rows.rs` (Game options uses it too). `SKATE_VIDEO_FX=<effect>=<level>,...` overrides them for A/B runs without touching the file.
 - Performance (SK-018): `scripts/Bench-Graphics.ps1` A/B benchmark with `SKATE_RENDER_SCALE`/`SKATE_MSAA`/`SKATE_FPS_LIMIT`/`SKATE_CHARACTER_SHADOW` overrides; the character shadow map uses 2 cascades to 40 m instead of 4 to 100 m. Results in [docs/performance.md](docs/performance.md).
 - Controller polling no longer queries empty XInput slots every frame (re-checked once per second): main schedule ~3 ms faster, about +20% FPS on University (SK-028). `SKATE_PERF_REPORT` now records the GPU adapter and effective graphics settings; `Bench-Graphics.ps1 -Repeats N` prints mean and deviation.
 

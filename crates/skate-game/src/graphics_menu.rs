@@ -45,6 +45,8 @@ struct GraphicsSettings {
     hour: f32,
     day_speed: u32,
     ambient_level: Option<u32>,
+    /// Optional effects beyond the original game (SK-051); missing in older files = all Off.
+    effects: crate::video_effects::VideoEffects,
 }
 impl Default for GraphicsSettings {
     fn default() -> Self {
@@ -58,6 +60,7 @@ impl Default for GraphicsSettings {
             hour: 12.,
             day_speed: 60,
             ambient_level: None,
+            effects: default(),
         }
     }
 }
@@ -78,6 +81,7 @@ impl GraphicsSettings {
         if !LIMITS.contains(&self.fps) {
             self.fps = 0;
         }
+        self.effects = std::mem::take(&mut self.effects).validated();
         self
     }
     fn internal_size(&self, window: UVec2) -> UVec2 {
@@ -99,10 +103,12 @@ pub(crate) struct Menu {
     browser: bool,
     daylight: bool,
     options: bool,
+    effects: bool,
 }
-// Main page rows; the last one opens the Game options page.
-const MAIN_ROWS: usize = 18;
+// Main page rows; the last two open the Game options and Video effects pages.
+const MAIN_ROWS: usize = 19;
 const OPTIONS_ROW: usize = 17;
+const EFFECTS_ROW: usize = 18;
 impl Menu {
     /// Effective graphics settings, for SKATE_PERF_REPORT (SK-028).
     pub(crate) fn settings_json(&self) -> serde_json::Value {
@@ -117,12 +123,16 @@ impl Menu {
         }
         self.settings.hour
     }
+    /// Effect settings, chosen MSAA and occlusion culling, for `video_effects::sync` (SK-051).
+    pub(crate) fn video_effects(&self) -> (&crate::video_effects::VideoEffects, u32, bool) {
+        (&self.settings.effects, self.settings.samples, self.settings.occlusion)
+    }
     pub(crate) fn diagnostic_settings(&self) -> String {
         format!("{:?}", self.settings)
     }
     /// Menu position for UI sounds (SK-022): open, page (main/options/multiplayer/daylight), row.
     pub(crate) fn sound_cursor(&self) -> crate::audio::MenuCursor {
-        let page = if self.daylight { 3 } else if self.options { 1 } else if self.multiplayer { 2 } else { 0 };
+        let page = if self.effects { 4 } else if self.daylight { 3 } else if self.options { 1 } else if self.multiplayer { 2 } else { 0 };
         crate::audio::MenuCursor { open: self.open, page, row: self.selected }
     }
     pub(crate) fn transition_finished(&mut self, status: String, resume: bool) {
@@ -159,7 +169,7 @@ impl Plugin for GraphicsMenuPlugin {
         app.insert_resource(FramePacer(Instant::now()))
             .add_systems(PostStartup, setup.in_set(PresentationSetup))
             .add_systems(PreUpdate, interact.in_set(MenuInput).after(bevy::input::InputSystems))
-            .add_systems(Update, (crate::map_render::advance_day, apply, labels).chain())
+            .add_systems(Update, (crate::map_render::advance_day, apply, crate::video_effects::sync, labels).chain())
             .add_systems(PostUpdate, crate::map_render::position_celestial_bodies.before(bevy::transform::TransformSystems::Propagate))
             .add_systems(Last, pace);
     }
@@ -223,6 +233,9 @@ fn setup(
     }
     if !supported_msaa.contains(&settings.samples) {
         settings.samples = 1;
+    }
+    if let Ok(spec) = std::env::var("SKATE_VIDEO_FX") {
+        settings.effects.apply_overrides(&spec);
     }
     // A launcher-placed window (--window) keeps its rectangle instead of the saved size.
     if config.window.is_none() {
@@ -295,6 +308,7 @@ fn setup(
         browser: false,
         daylight: false,
         options: false,
+        effects: false,
     });
 }
 fn msaa(samples: u32) -> Msaa {
@@ -358,7 +372,8 @@ pub(crate) fn interact(
         }
     }
     if menu.open {
-        let rows = if menu.daylight { 4 } else if menu.options { crate::game_options::ROWS.len() + 1 }
+        let rows = if menu.effects { crate::option_rows::page_len(crate::video_effects::ROWS) }
+            else if menu.daylight { 4 } else if menu.options { crate::option_rows::page_len(crate::game_options::ROWS) }
             else if menu.multiplayer { 11 } else { MAIN_ROWS };
         if !panel.focused {
         if keys.just_pressed(KeyCode::ArrowUp) || nav.pressed & 1 != 0 {
@@ -384,17 +399,24 @@ pub(crate) fn interact(
     }
     if let Some((row, direction)) = action {
         let day_action = menu.daylight;
-        let options_action = menu.options;
-        if menu.options {
-            match crate::game_options::ROWS.get(row) {
-                Some(option) => {
-                    (option.change)(&mut options, direction);
-                    menu.status = match options.save() {
-                        Ok(()) => "Saved".into(),
-                        Err(e) => format!("Could not save: {e}"),
-                    };
-                }
-                None => { menu.options = false; menu.selected = OPTIONS_ROW; }
+        let options_action = menu.options || menu.effects;
+        if menu.effects {
+            if crate::option_rows::change(crate::video_effects::ROWS, row, &mut menu.settings.effects, direction) {
+                menu.status = save_settings(&menu);
+            } else {
+                menu.effects = false;
+                menu.selected = EFFECTS_ROW;
+                menu.status.clear();
+            }
+        } else if menu.options {
+            if crate::option_rows::change(crate::game_options::ROWS, row, &mut options, direction) {
+                menu.status = match options.save() {
+                    Ok(()) => "Saved".into(),
+                    Err(e) => format!("Could not save: {e}"),
+                };
+            } else {
+                menu.options = false;
+                menu.selected = OPTIONS_ROW;
             }
         } else if menu.daylight {
             match row {
@@ -511,29 +533,34 @@ pub(crate) fn interact(
                 15 => mods.begin(),
                 16 => { menu.daylight = true; menu.selected = 0; menu.status = "Custom maps: change time, cycle speed and ambient light. Retail lighting stays authored.".into(); },
                 OPTIONS_ROW => { menu.options = true; menu.selected = 0; menu.status.clear(); },
+                EFFECTS_ROW => { menu.effects = true; menu.selected = 0; menu.status = "Extras beyond the original game; Off keeps the stock look.".into(); },
                 _ => {}
             }
         }
         if !options_action
             && ((row < 5 && !menu.multiplayer && !menu.daylight && !day_action) || (day_action && row < 3)) {
-            let save = (|| -> Result<(), String> {
-                std::fs::create_dir_all(menu.path.parent().unwrap()).map_err(|e| e.to_string())?;
-                std::fs::write(
-                    &menu.path,
-                    serde_json::to_vec_pretty(&menu.settings).map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())
-            })();
-            menu.status = match save {
-                Ok(()) => "Saved".into(),
-                Err(e) => format!("Could not save: {e}"),
-            };
+            menu.status = save_settings(&menu);
         }
     }
     if menu.open && !net.active() {
         time.pause();
     } else {
         time.unpause();
+    }
+}
+/// Writes settings/graphics.json; returns the status line.
+fn save_settings(menu: &Menu) -> String {
+    let save = (|| -> Result<(), String> {
+        std::fs::create_dir_all(menu.path.parent().unwrap()).map_err(|e| e.to_string())?;
+        std::fs::write(
+            &menu.path,
+            serde_json::to_vec_pretty(&menu.settings).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())
+    })();
+    match save {
+        Ok(()) => "Saved".into(),
+        Err(e) => format!("Could not save: {e}"),
     }
 }
 fn apply(
@@ -620,11 +647,10 @@ fn labels(
     let s = &menu.settings;
     let size = s.internal_size(window.physical_size());
     for (label, mut text) in &mut labels {
-        **text = if menu.options {
-            match crate::game_options::ROWS.get(label.0) {
-                Some(option) => format!("{:<22}{}", option.label, (option.value)(&options)),
-                None => "Back".into(),
-            }
+        **text = if menu.effects {
+            crate::option_rows::row_text(crate::video_effects::ROWS, label.0, &s.effects)
+        } else if menu.options {
+            crate::option_rows::row_text(crate::game_options::ROWS, label.0, &options)
         } else if menu.daylight {
             match label.0 {
                 0 => { let minutes = (s.hour * 60.).floor() as u32 % 1440; format!("Time of day          {:02}:{:02}", minutes / 60, minutes % 60) },
@@ -723,6 +749,7 @@ fn labels(
                 14 => "Teleport…".into(),
                 16 => "Day & night…".into(),
                 OPTIONS_ROW => "Game options…".into(),
+                EFFECTS_ROW => "Video effects…".into(),
                 _ => "Multiplayer".into(),
             }
         };
@@ -746,7 +773,8 @@ fn labels(
     };
     for (row, interaction, mut color, mut node) in &mut buttons {
         node.display = if (menu.daylight && row.0 >= 4) || (menu.multiplayer && row.0 >= 11)
-            || (menu.options && row.0 > crate::game_options::ROWS.len()) { Display::None } else { Display::Flex };
+            || (menu.options && row.0 > crate::game_options::ROWS.len())
+            || (menu.effects && row.0 > crate::video_effects::ROWS.len()) { Display::None } else { Display::Flex };
         color.0 = if row.0 == menu.selected || *interaction == Interaction::Hovered {
             Color::srgb(0.10, 0.30, 0.34)
         } else {
@@ -785,7 +813,7 @@ mod tests {
             .insert_resource(Menu {
                 open: false, selected: 0, settings: GraphicsSettings::default(),
                 difficulty: Difficulty::Easy, path: PathBuf::new(), supported_msaa: vec![1, 2, 4, 8], status: String::new(),
-                multiplayer: false, browser: false, daylight: false, options: false,
+                multiplayer: false, browser: false, daylight: false, options: false, effects: false,
                 maps: vec![crate::map_library::Entry { label: "Test world".into(), path: None }], selected_map: 0,
             })
             .add_systems(Update, apply);
@@ -839,6 +867,18 @@ mod tests {
             serde_json::from_str(r#"{"width":0,"height":999999,"scale":0,"samples":3,"fps":1}"#)
                 .unwrap();
         assert_eq!(settings.validated(), GraphicsSettings::default());
+    }
+    #[test]
+    fn old_settings_without_effects_load_with_effects_off() {
+        let settings: GraphicsSettings = serde_json::from_str(
+            r#"{"width":1920,"height":1080,"scale":200,"samples":2,"fps":0,"occlusion":true,"hour":12.0,"day_speed":60,"ambient_level":null}"#,
+        )
+        .unwrap();
+        assert_eq!(settings.effects, crate::video_effects::VideoEffects::default());
+        assert_eq!(settings.scale, 200);
+        let saved = serde_json::to_string(&GraphicsSettings::default()).unwrap();
+        assert!(saved.contains("\"effects\""));
+        assert_eq!(serde_json::from_str::<GraphicsSettings>(&saved).unwrap(), GraphicsSettings::default());
     }
     #[test]
     fn scaled_target_and_cycle_boundaries() {
