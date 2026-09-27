@@ -31,7 +31,8 @@ top whenever the file changes:
 5 a+rb 0 0.5 0 1       buttons: a b x y start back lb rb l3 r3 up down left right
 ```
 
-Copy a scenario from `scenarios/` (five pushes and ollies; walking plus pause-menu navigation)
+Copy a scenario from `scenarios/` (five pushes and ollies; walking plus pause-menu navigation;
+five bails with the Xbox bail chord; five grind attempts on the handrail left of the spawn)
 to `logs/pad-script.txt`, wait for its `end` marker in the trace, then summarise what follows
 each action: `--recurring ollie 2.2` lists the ids that start within 2.2 s after most
 `ollie <n>` markers. Pedestrians, other skaters and ambience play all the time, so only ids that
